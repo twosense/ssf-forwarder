@@ -1,0 +1,417 @@
+{
+  "companyId": "7e1777b6-2a2f-4a4f-8640-7a7d4d2fb730",
+  "connectorIds": [
+    "httpConnector",
+    "functionsConnector"
+  ],
+  "createdDate": 1775079790367,
+  "currentVersion": 3,
+  "customerId": "ad31aa71328c4d755d1eb5cde90f1454",
+  "description": "",
+  "flowStatus": "enabled",
+  "name": "ssf-forwarder CAEP Receiver Example",
+  "flowId": "a7bdde50c00e7d3b389be696e42feff2",
+  "versionId": 3,
+  "graphData": {
+    "elements": {
+      "nodes": [
+        {
+          "data": {
+            "id": "folr1lljp2",
+            "nodeType": "CONNECTION",
+            "connectionId": "481e952e6b11db8360587b8711620786",
+            "connectorId": "httpConnector",
+            "name": "HTTP",
+            "label": "HTTP",
+            "status": "configured",
+            "capabilityName": "createUnwrappedResponse",
+            "type": "action",
+            "properties": {
+              "httpStatusCode": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"202\"\n      }\n    ]\n  }\n]"
+              },
+              "jsonString": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"{\\\"message\\\": \\\"Sessions revoked for user: `\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"url:tttqafgwm8\",\n        \"url\": \"username\",\n        \"data\": \"{{local.tttqafgwm8.payload.output.username}}\",\n        \"tooltip\": \"{{local.tttqafgwm8.payload.output.username}}\",\n        \"children\": [\n          {\n            \"text\": \"{{local.tttqafgwm8.payload.output.username}}\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"`\\\"}\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Success Response"
+              },
+              "nodeDescription": {
+                "value": "Send success response (202)"
+              },
+              "backgroundColor": {
+                "value": "#7ed321ff"
+              }
+            }
+          },
+          "position": {
+            "x": 930,
+            "y": 240
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "tttqafgwm8",
+            "nodeType": "CONNECTION",
+            "connectionId": "de650ca45593b82c49064ead10b9fe17",
+            "connectorId": "functionsConnector",
+            "name": "Functions",
+            "label": "Functions",
+            "status": "configured",
+            "capabilityName": "customFunction",
+            "type": "trigger",
+            "properties": {
+              "variableInputList": {
+                "value": [
+                  {
+                    "name": "jwt",
+                    "preferredDataType": "string",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"auth.svg\",\n        \"url\": \"jwt\",\n        \"data\": \"{{global.parameters.jwt}}\",\n        \"tooltip\": \"{{global.parameters.jwt}}\",\n        \"children\": [\n          {\n            \"text\": \"jwt\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              },
+              "code": {
+                "value": "module.exports = async ({ params }) => {\n  const jwtString = params.jwt;\n\n  // Decode JWT\n  const { payload } = decodeJWT(jwtString);\n  \n  // Check if it's a session-revoked event\n  const eventType = getEventType(payload);\n  \n  if (eventType !== 'https://schemas.openid.net/secevent/caep/event-type/session-revoked') {\n    throw new Error(`Unsupported event type: ${eventType}`);\n  }\n  \n  // Extract username\n  const username = extractUsername(payload);\n  \n  return { jwt: params.jwt, username: username };\n};\n\n// Helper Functions\nfunction decodeJWT(jwtString) {\n  const parts = jwtString.split('.');\n  if (parts.length !== 3) {\n    throw new Error('Invalid JWT format');\n  }\n  \n  const decode = (str) => JSON.parse(\n    Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()\n  );\n  \n  return {\n    header: decode(parts[0]),\n    payload: decode(parts[1]),\n    parts: parts\n  };\n}\n\nfunction getEventType(payload) {\n  // CAEP events are in the \"events\" object\n  // Example: { \"events\": { \"https://schemas.openid.net/.../session-revoked\": {...} } }\n  \n  if (!payload.events || typeof payload.events !== 'object') {\n    throw new Error('No events found in JWT payload');\n  }\n  \n  const eventTypes = Object.keys(payload.events);\n  \n  if (eventTypes.length === 0) {\n    throw new Error('Events object is empty');\n  }\n  \n  // Return the first (and typically only) event type\n  return eventTypes[0];\n}\n\nfunction extractUsername(payload) {\n  const fullUsername = payload.sub_id?.username?.id;\n  \n  if (!fullUsername) {\n    throw new Error('Username not found in JWT');\n  }\n  \n  // Strip domain prefix (e.g., \"twosense-dev\\jbergeron\" → \"jbergeron\")\n  // Handle both backslash (Windows) and forward slash formats\n  const username = fullUsername.split(/[\\\\\\/]/).pop();\n  \n  return username;\n}"
+              },
+              "nodeTitle": {
+                "value": "Extract username from JWT"
+              },
+              "nodeDescription": {},
+              "outputSchema": {
+                "value": "{\n\t\"output\": {\n\t\t\"type\": \"object\",\n\t\t\"properties\": {\n\t\t\t\"jwt\": {\n\t\t\t\t\"type\": \"string\"\n\t\t\t},\n\t\t\t\"username\": {\n      \"type\": \"string\",\n      \"description\": \"Username for session revocation\"\n    }\n\t\t}\n\t}\n}"
+              }
+            }
+          },
+          "position": {
+            "x": 270,
+            "y": 240
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "k0j8rctvsj",
+            "nodeType": "EVAL",
+            "properties": {
+              "lbContext": {
+                "value": "global"
+              },
+              "3y83hvnhj1": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 420,
+            "y": 240
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "3y83hvnhj1",
+            "nodeType": "CONNECTION",
+            "connectionId": "481e952e6b11db8360587b8711620786",
+            "connectorId": "httpConnector",
+            "name": "HTTP",
+            "label": "HTTP",
+            "status": "configured",
+            "capabilityName": "createUnwrappedResponse",
+            "type": "action",
+            "properties": {
+              "jsonString": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"{\\\"error\\\": \\\"\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"url:tttqafgwm8\",\n        \"url\": \"message\",\n        \"data\": \"{{local.tttqafgwm8.payload.error.message}}\",\n        \"tooltip\": \"{{local.tttqafgwm8.payload.error.message}}\",\n        \"children\": [\n          {\n            \"text\": \"{{local.tttqafgwm8.payload.error.message}}\"\n          }\n        ]\n      },\n      {\n        \"text\": \"/\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"http.svg\",\n        \"url\": \"message\",\n        \"data\": \"{{local.c8d8jivhfe.payload.error.message}}\",\n        \"tooltip\": \"{{local.c8d8jivhfe.payload.error.message}}\",\n        \"children\": [\n          {\n            \"text\": \"message\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"\\\"}\"\n      }\n    ]\n  }\n]"
+              },
+              "nodeTitle": {
+                "value": "Error Response"
+              },
+              "nodeDescription": {
+                "value": "Error Response"
+              },
+              "backgroundColor": {
+                "value": "#d0021bff"
+              },
+              "httpStatusCode": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"400\"\n      }\n    ]\n  }\n]"
+              }
+            }
+          },
+          "position": {
+            "x": 930,
+            "y": 420
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "c8d8jivhfe",
+            "nodeType": "CONNECTION",
+            "connectionId": "481e952e6b11db8360587b8711620786",
+            "connectorId": "httpConnector",
+            "name": "HTTP",
+            "label": "HTTP",
+            "status": "configured",
+            "capabilityName": "makeRestApiCall",
+            "type": "trigger",
+            "properties": {
+              "nodeTitle": {
+                "value": "PingFed - Revoke User Sessions"
+              },
+              "nodeDescription": {
+                "value": "Revoke user sessions for the user"
+              },
+              "httpMethod": {
+                "value": "POST"
+              },
+              "url": {
+                "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"https://your-ping-instance.example.com/pf-ws/rest/sessionMgmt/users/\"\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"type\": \"link\",\n        \"src\": \"functions.svg\",\n        \"url\": \"username\",\n        \"data\": \"{{local.tttqafgwm8.payload.output.username}}\",\n        \"tooltip\": \"{{local.tttqafgwm8.payload.output.username}}\",\n        \"children\": [\n          {\n            \"text\": \"username\"\n          }\n        ]\n      },\n      {\n        \"text\": \"\"\n      },\n      {\n        \"text\": \"/revoke\"\n      }\n    ]\n  }\n]"
+              },
+              "headers": {
+                "value": [
+                  {
+                    "key": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Authorization\"\n      }\n    ]\n  }\n]",
+                    "value": "[\n  {\n    \"children\": [\n      {\n        \"text\": \"Basic YOUR_PING_INSTANCE_CREDENTIALS\"\n      }\n    ]\n  }\n]"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 600,
+            "y": 240
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "jzd7o5jamq",
+            "nodeType": "EVAL",
+            "properties": {
+              "lbContext": {
+                "value": "global"
+              },
+              "3y83hvnhj1": {
+                "value": "anyTriggersFalse"
+              }
+            }
+          },
+          "position": {
+            "x": 750,
+            "y": 240
+          },
+          "group": "nodes",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": false,
+          "classes": ""
+        }
+      ],
+      "edges": [
+        {
+          "data": {
+            "id": "a37oqqa1mb",
+            "source": "c8d8jivhfe",
+            "target": "jzd7o5jamq"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "gnxwnvfg6i",
+            "source": "k0j8rctvsj",
+            "target": "c8d8jivhfe"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "5dtpi0zsl7",
+            "source": "tttqafgwm8",
+            "target": "k0j8rctvsj"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "32f5xmb2fh",
+            "source": "jzd7o5jamq",
+            "target": "folr1lljp2"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "nt80sz2xpg",
+            "source": "jzd7o5jamq",
+            "target": "3y83hvnhj1"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        },
+        {
+          "data": {
+            "id": "pipk3tskgs",
+            "source": "k0j8rctvsj",
+            "target": "3y83hvnhj1"
+          },
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "group": "edges",
+          "removed": false,
+          "selected": false,
+          "selectable": true,
+          "locked": false,
+          "grabbable": true,
+          "pannable": true,
+          "classes": ""
+        }
+      ]
+    },
+    "data": {},
+    "zoomingEnabled": true,
+    "userZoomingEnabled": true,
+    "zoom": 1,
+    "minZoom": 1e-50,
+    "maxZoom": 1e+50,
+    "panningEnabled": true,
+    "userPanningEnabled": true,
+    "pan": {
+      "x": 0,
+      "y": 0
+    },
+    "boxSelectionEnabled": true,
+    "renderer": {
+      "name": "null"
+    }
+  },
+  "isInputSchemaSaved": true,
+  "inputSchemaCompiled": {
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "jwt": {
+          "description": "CAEP Security Event Token (JWT)",
+          "preferredDataType": "string",
+          "type": "string",
+          "name": "jwt"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "jwt"
+      ]
+    }
+  },
+  "inputSchema": [
+    {
+      "propertyName": "jwt",
+      "description": "CAEP Security Event Token (JWT)",
+      "preferredDataType": "string",
+      "preferredControlType": "textField",
+      "required": true
+    }
+  ],
+  "settings": {
+    "logLevel": 4
+  },
+  "flowColor": "#E3F0FF",
+  "savedDate": 1775079790333,
+  "variables": [],
+  "forms": {},
+  "connections": []
+}
