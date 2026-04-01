@@ -1,0 +1,20 @@
+receiver:
+  public_url: "https://receiver.example.com"  # externally reachable URL for this service
+  listen_addr: ":8080"
+  endpoint: "/events"
+
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "your-token-here"
+  events_requested:
+    - "https://schemas.openid.net/secevent/caep/event-type/session-revoked"
+    - "https://schemas.openid.net/secevent/caep/event-type/credential-change"
+
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+    headers:
+      Authorization: "Bearer your-sink-token"
+  - type: log
