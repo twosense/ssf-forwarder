@@ -19,7 +19,7 @@ We've created some guides for common use cases we call "recipes":
 
 ## Requirements
 
-- Go 1.24+
+- Go 1.26+
 - A running SSF transmitter that supports push delivery
 
 ## Installation
