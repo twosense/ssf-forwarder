@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,6 +11,10 @@ import (
 	"github.com/sgnl-ai/caep.dev/secevent/pkg/token"
 	"github.com/twosense/ssf-forwarder/internal/sink"
 )
+
+// maxBodySize is the largest SET payload the handler will accept.
+// JWTs are typically a few KB; 64 KB is a generous ceiling.
+const maxBodySize = 64 * 1024
 
 // setParser validates an incoming SET token string.
 type setParser interface {
@@ -36,8 +41,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+
 	rawToken, err := io.ReadAll(r.Body)
 	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
 		slog.Error("reading request body", "err", err)
 		http.Error(w, "failed to read body", http.StatusInternalServerError)
 		return

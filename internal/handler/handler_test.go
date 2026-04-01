@@ -88,6 +88,12 @@ func TestHandler_ServeHTTP(t *testing.T) {
 			wantStatus: http.StatusBadRequest,
 		},
 		{
+			name:       "body exceeding size limit returns 413",
+			method:     http.MethodPost,
+			body:       string(make([]byte, maxBodySize+1)),
+			wantStatus: http.StatusRequestEntityTooLarge,
+		},
+		{
 			name:       "valid SET returns 202 and forwards to sink",
 			method:     http.MethodPost,
 			body:       "valid.token.value",
