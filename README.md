@@ -1,6 +1,6 @@
 # SSF Forwarder
 
-A lightweight [Shared Signals Framework](https://openid.net/specs/openid-sharedsignals-framework-1_0.html) receiver that validates incoming Security Event Tokens (SETs) and forwards them to one or more HTTP webhook sinks.
+A lightweight [Shared Signals Framework](https://openid.net/specs/openid-sharedsignals-framework-1_0.html) receiver that validates incoming Security Event Tokens (SETs) and forwards them to one or more sinks.
 
 - Push delivery only (no polling)
 - Single transmitter per config file
