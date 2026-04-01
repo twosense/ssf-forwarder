@@ -3,7 +3,6 @@ package sink
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -142,9 +141,6 @@ func TestLogSink_EventTypes_Sorted(t *testing.T) {
 			"urn:m": map[string]any{},
 		},
 	}
-	payloadJSON, _ := json.Marshal(claims)
-	_ = payloadJSON // used via fakeJWT helper
-
 	var buf bytes.Buffer
 	ls := NewLogSink(newTestLogger(&buf))
 
