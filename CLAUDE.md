@@ -41,6 +41,6 @@ Follow standard Go project layout:
 
 ## Standards reference
 
-The full text of the CAEP and SSF specifications are located in `docs/openid-caep-1_0-final.txt` and `openid-sharedsignals-framework-1_0-final.txt` respectively. Reference them to ensure compliance with each standard.
+The full text of the CAEP and SSF specifications are located under `docs/specs/` as `openid-caep-1_0-final.txt` and `openid-sharedsignals-framework-1_0-final.txt` respectively. Reference them to ensure compliance with each standard.
 
 Use the official reference SSF receiver library: https://github.com/SGNL-ai/caep.dev/tree/main/ssfreceiver
