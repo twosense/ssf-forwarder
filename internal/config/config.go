@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -63,6 +65,14 @@ func Load(path string) (*Config, error) {
 func (c *Config) validate() error {
 	if c.Receiver.PublicURL == "" {
 		return fmt.Errorf("receiver.public_url is required")
+	}
+
+	if u, err := url.Parse(c.Receiver.PublicURL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("receiver.public_url must be an absolute HTTP or HTTPS URL")
+	}
+
+	if c.Receiver.Endpoint != "" && !strings.HasPrefix(c.Receiver.Endpoint, "/") {
+		return fmt.Errorf("receiver.endpoint must start with /")
 	}
 
 	if c.Transmitter.MetadataURL == "" {

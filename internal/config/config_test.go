@@ -189,6 +189,55 @@ sinks:
 			},
 		},
 		{
+			name: "public_url without scheme rejected",
+			yaml: `
+receiver:
+  public_url: "receiver.example.com"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+`,
+			wantErr: "receiver.public_url must be an absolute HTTP or HTTPS URL",
+		},
+		{
+			name: "public_url with non-http scheme rejected",
+			yaml: `
+receiver:
+  public_url: "ftp://receiver.example.com"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+`,
+			wantErr: "receiver.public_url must be an absolute HTTP or HTTPS URL",
+		},
+		{
+			name: "endpoint without leading slash rejected",
+			yaml: `
+receiver:
+  public_url: "https://receiver.example.com"
+  endpoint: "events"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+`,
+			wantErr: "receiver.endpoint must start with /",
+		},
+		{
 			name:    "missing receiver public_url",
 			yaml: `
 transmitter:
