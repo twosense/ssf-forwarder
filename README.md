@@ -15,6 +15,7 @@ For easy deployment, see the [Docker deployment guide](./docs/deployment/docker.
 We've created some guides for common use cases we call "recipes":
 
 - [Forward CAEP Events to PingOne DaVinci](./docs/recipes/pingone-davinci/recipe.md)
+- [Test `ssf-forwarder` with [caep.dev](https://caep.dev/)](./docs/recipes/caep-dev/recipe.md)
 
 ## Requirements
 
