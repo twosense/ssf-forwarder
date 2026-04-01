@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+	"time"
 )
 
 // TemplateData is passed to body_template when rendering.
@@ -23,12 +24,14 @@ type WebhookSink struct {
 	url          string
 	headers      map[string]string
 	bodyTemplate *template.Template
+	client       *http.Client
 }
 
 func NewWebhookSink(url string, headers map[string]string, bodyTemplate string) (*WebhookSink, error) {
 	ws := &WebhookSink{
 		url:     url,
 		headers: headers,
+		client:  &http.Client{Timeout: 30 * time.Second},
 	}
 
 	if bodyTemplate != "" {
@@ -66,7 +69,7 @@ func (ws *WebhookSink) Send(ctx context.Context, rawToken []byte, incomingHeader
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ws.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("sending request: %w", err)
 	}
