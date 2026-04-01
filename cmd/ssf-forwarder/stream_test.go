@@ -15,10 +15,10 @@ import (
 // whose configuration_endpoint points back to configEndpointURL.
 func minimalSSFMetadata(issuer, configEndpointURL string) []byte {
 	b, _ := json.Marshal(map[string]any{
-		"issuer":                       issuer,
-		"jwks_uri":                     issuer + "/jwks",
-		"delivery_methods_supported":   []string{"urn:ietf:rfc:8935"},
-		"configuration_endpoint":       configEndpointURL,
+		"issuer":                     issuer,
+		"jwks_uri":                   issuer + "/jwks",
+		"delivery_methods_supported": []string{"urn:ietf:rfc:8935"},
+		"configuration_endpoint":     configEndpointURL,
 	})
 	return b
 }

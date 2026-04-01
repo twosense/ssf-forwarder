@@ -22,9 +22,9 @@ type ReceiverConfig struct {
 }
 
 type TransmitterConfig struct {
-	MetadataURL     string   `yaml:"metadata_url"`
+	MetadataURL     string     `yaml:"metadata_url"`
 	Auth            AuthConfig `yaml:"auth"`
-	EventsRequested []string `yaml:"events_requested"`
+	EventsRequested []string   `yaml:"events_requested"`
 }
 
 type AuthConfig struct {

@@ -12,8 +12,8 @@ import (
 	"github.com/sgnl-ai/caep.dev/ssfreceiver/auth"
 	"github.com/sgnl-ai/caep.dev/ssfreceiver/builder"
 	"github.com/sgnl-ai/caep.dev/ssfreceiver/stream"
-	"golang.org/x/oauth2/clientcredentials"
 	"github.com/twosense/ssf-forwarder/internal/config"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
 // transmitterMetadata holds the fields needed from the SSF transmitter metadata endpoint.

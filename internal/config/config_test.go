@@ -238,7 +238,7 @@ sinks:
 			wantErr: "receiver.endpoint must start with /",
 		},
 		{
-			name:    "missing receiver public_url",
+			name: "missing receiver public_url",
 			yaml: `
 transmitter:
   metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
@@ -252,7 +252,7 @@ sinks:
 			wantErr: "receiver.public_url is required",
 		},
 		{
-			name:    "missing transmitter metadata_url",
+			name: "missing transmitter metadata_url",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -267,7 +267,7 @@ sinks:
 			wantErr: "transmitter.metadata_url is required",
 		},
 		{
-			name:    "invalid auth type",
+			name: "invalid auth type",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -283,7 +283,7 @@ sinks:
 			wantErr: "transmitter.auth.type must be 'bearer' or 'oauth2'",
 		},
 		{
-			name:    "bearer auth missing token",
+			name: "bearer auth missing token",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -298,7 +298,7 @@ sinks:
 			wantErr: "transmitter.auth.token is required for bearer auth",
 		},
 		{
-			name:    "oauth2 missing token_url",
+			name: "oauth2 missing token_url",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -315,7 +315,7 @@ sinks:
 			wantErr: "transmitter.auth.token_url is required for oauth2 auth",
 		},
 		{
-			name:    "oauth2 missing client_id",
+			name: "oauth2 missing client_id",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -332,7 +332,7 @@ sinks:
 			wantErr: "transmitter.auth.client_id is required for oauth2 auth",
 		},
 		{
-			name:    "oauth2 missing client_secret",
+			name: "oauth2 missing client_secret",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -349,7 +349,7 @@ sinks:
 			wantErr: "transmitter.auth.client_secret is required for oauth2 auth",
 		},
 		{
-			name:    "no sinks",
+			name: "no sinks",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -405,7 +405,7 @@ sinks:
 			},
 		},
 		{
-			name:    "unsupported sink type",
+			name: "unsupported sink type",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
@@ -421,7 +421,7 @@ sinks:
 			wantErr: `unsupported sink type "kafka"`,
 		},
 		{
-			name:    "sink missing url",
+			name: "sink missing url",
 			yaml: `
 receiver:
   public_url: "https://receiver.example.com"
