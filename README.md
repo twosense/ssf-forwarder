@@ -142,6 +142,32 @@ On startup, the service:
 
 On shutdown (SIGINT/SIGTERM), the stream is deleted from the transmitter before the process exits.
 
+## Docker
+
+Build the image:
+
+```sh
+docker build -t ssf-forwarder .
+```
+
+Run with a config file mounted in:
+
+```sh
+docker run --rm \
+  -v /path/to/config.yaml:/etc/ssf-forwarder/config.yaml:ro \
+  -p 8080:8080 \
+  ssf-forwarder
+```
+
+The default config path inside the container is `/etc/ssf-forwarder/config.yaml`. Override it with `--config`:
+
+```sh
+docker run --rm \
+  -v /path/to/config.yaml:/config.yaml:ro \
+  -p 8080:8080 \
+  ssf-forwarder --config /config.yaml
+```
+
 ## Development
 
 ```sh
