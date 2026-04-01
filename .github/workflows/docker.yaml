@@ -4,8 +4,7 @@ on:
   pull_request:
   push:
     branches: [ "develop" ]
-  release:
-    types: [ "published" ]
+    tags: [ "v*" ]
 
 env:
   # Use docker.io for Docker Hub if empty
