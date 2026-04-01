@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -39,7 +40,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	pushURL := cfg.Receiver.PublicURL + cfg.Receiver.Endpoint
+	pushURL, err := url.JoinPath(cfg.Receiver.PublicURL, cfg.Receiver.Endpoint)
+	if err != nil {
+		slog.Error("building push URL", "err", err)
+		os.Exit(1)
+	}
 
 	stream, err := setupStream(ctx, cfg.Transmitter, pushURL)
 	if err != nil {

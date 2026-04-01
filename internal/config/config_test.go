@@ -435,6 +435,38 @@ sinks:
 `,
 			wantErr: "sinks[0].url is required",
 		},
+		{
+			name: "sink url without scheme rejected",
+			yaml: `
+receiver:
+  public_url: "https://receiver.example.com"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "webhook.example.com/events"
+`,
+			wantErr: "sinks[0].url must be an absolute HTTP or HTTPS URL",
+		},
+		{
+			name: "metadata_url without scheme rejected",
+			yaml: `
+receiver:
+  public_url: "https://receiver.example.com"
+transmitter:
+  metadata_url: "transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+`,
+			wantErr: "transmitter.metadata_url must be an absolute HTTP or HTTPS URL",
+		},
 	}
 
 	for _, tc := range tests {

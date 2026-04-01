@@ -79,6 +79,10 @@ func (c *Config) validate() error {
 		return fmt.Errorf("transmitter.metadata_url is required")
 	}
 
+	if u, err := url.Parse(c.Transmitter.MetadataURL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("transmitter.metadata_url must be an absolute HTTP or HTTPS URL")
+	}
+
 	switch c.Transmitter.Auth.Type {
 	case "bearer":
 		if c.Transmitter.Auth.Token == "" {
@@ -107,6 +111,9 @@ func (c *Config) validate() error {
 		case "webhook":
 			if sink.URL == "" {
 				return fmt.Errorf("sinks[%d].url is required", i)
+			}
+			if u, err := url.Parse(sink.URL); err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+				return fmt.Errorf("sinks[%d].url must be an absolute HTTP or HTTPS URL", i)
 			}
 		case "log":
 			// no required fields

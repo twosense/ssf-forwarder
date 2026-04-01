@@ -68,7 +68,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 
-	go h.fanOut(r.Context(), rawToken, r.Header)
+	go h.fanOut(context.WithoutCancel(r.Context()), rawToken, r.Header)
 }
 
 func (h *Handler) fanOut(ctx context.Context, rawToken []byte, headers http.Header) {
