@@ -10,6 +10,12 @@ A lightweight [Shared Signals Framework](https://openid.net/specs/openid-shareds
 
 For easy deployment, see the [Docker deployment guide](./docs/deployment/docker.md).
 
+### Recipes
+
+We've created some guides for common use cases we call "recipes":
+
+- [Forward CAEP Events to PingOne DaVinci](./docs/recipes/pingone-davinci/recipe.md)
+
 ## Requirements
 
 - Go 1.24+
