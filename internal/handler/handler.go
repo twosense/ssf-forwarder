@@ -56,7 +56,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 
-	h.fanOut(r.Context(), rawToken, r.Header)
+	go h.fanOut(r.Context(), rawToken, r.Header)
 }
 
 func (h *Handler) fanOut(ctx context.Context, rawToken []byte, headers http.Header) {
@@ -65,13 +65,16 @@ func (h *Handler) fanOut(ctx context.Context, rawToken []byte, headers http.Head
 	for _, s := range h.sinks {
 		wg.Add(1)
 
-		go func(s sink.Sink) {
+		// Clone headers per sink to avoid concurrent access to a shared map.
+		headersCopy := headers.Clone()
+
+		go func(s sink.Sink, hdr http.Header) {
 			defer wg.Done()
 
-			if err := s.Send(ctx, rawToken, headers); err != nil {
+			if err := s.Send(ctx, rawToken, hdr); err != nil {
 				slog.Error("sink send failed", "err", err)
 			}
-		}(s)
+		}(s, headersCopy)
 	}
 
 	wg.Wait()
