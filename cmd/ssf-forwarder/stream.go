@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/sgnl-ai/caep.dev/secevent/pkg/event"
 	seceventparser "github.com/sgnl-ai/caep.dev/secevent/pkg/parser"
@@ -27,7 +28,7 @@ func fetchTransmitterMetadata(ctx context.Context, metadataURL string) (*transmi
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching metadata: %w", err)
 	}
