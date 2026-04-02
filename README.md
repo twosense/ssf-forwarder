@@ -1,6 +1,6 @@
 # SSF Forwarder
 
-A lightweight [Shared Signals Framework](https://openid.net/specs/openid-sharedsignals-framework-1_0.html) receiver that validates incoming Security Event Tokens (SETs) and forwards them to one or more sinks.
+A lightweight [Shared Signals Framework](https://openid.net/specs/openid-sharedsignals-framework-1_0.html) receiver based on [SGNL's `ssfreceiver` library](https://github.com/SGNL-ai/caep.dev/tree/main/ssfreceiver) that validates incoming Security Event Tokens (SETs) and forwards them to one or more sinks.
 
 ## Deployment
 
