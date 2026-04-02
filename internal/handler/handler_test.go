@@ -58,7 +58,7 @@ func (s *recordingSink) received() [][]byte {
 func (s *recordingSink) waitFor(t *testing.T, n int) {
 	t.Helper()
 
-	for i := 0; i < n; i++ {
+	for range n {
 		select {
 		case <-s.ch:
 		case <-time.After(time.Second):
