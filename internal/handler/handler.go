@@ -1,0 +1,93 @@
+package handler
+
+import (
+	"context"
+	"errors"
+	"io"
+	"log/slog"
+	"net/http"
+	"sync"
+
+	"github.com/sgnl-ai/caep.dev/secevent/pkg/token"
+	"github.com/twosense/ssf-forwarder/internal/sink"
+)
+
+// maxBodySize is the largest SET payload the handler will accept.
+// JWTs are typically a few KB; 64 KB is a generous ceiling.
+const maxBodySize = 64 * 1024
+
+// setParser validates an incoming SET token string.
+type setParser interface {
+	ParseSecEvent(tokenString string) (*token.SecEvent, error)
+}
+
+// Handler is an http.Handler that receives push-delivered SETs, validates them,
+// and fans out to all configured sinks.
+type Handler struct {
+	parser setParser
+	sinks  []sink.Sink
+}
+
+func New(p setParser, sinks []sink.Sink) *Handler {
+	return &Handler{
+		parser: p,
+		sinks:  sinks,
+	}
+}
+
+func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+
+	rawToken, err := io.ReadAll(r.Body)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		slog.Error("reading request body", "err", err)
+		http.Error(w, "failed to read body", http.StatusInternalServerError)
+		return
+	}
+
+	if len(rawToken) == 0 {
+		http.Error(w, "empty body", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := h.parser.ParseSecEvent(string(rawToken)); err != nil {
+		slog.Warn("SET validation failed", "err", err)
+		http.Error(w, "invalid SET", http.StatusBadRequest)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+
+	go h.fanOut(context.WithoutCancel(r.Context()), rawToken, r.Header)
+}
+
+func (h *Handler) fanOut(ctx context.Context, rawToken []byte, headers http.Header) {
+	var wg sync.WaitGroup
+
+	for _, s := range h.sinks {
+		wg.Add(1)
+
+		// Clone headers per sink to avoid concurrent access to a shared map.
+		headersCopy := headers.Clone()
+
+		go func(s sink.Sink, hdr http.Header) {
+			defer wg.Done()
+
+			if err := s.Send(ctx, rawToken, hdr); err != nil {
+				slog.Error("sink send failed", "err", err)
+			}
+		}(s, headersCopy)
+	}
+
+	wg.Wait()
+}
