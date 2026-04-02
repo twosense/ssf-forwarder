@@ -2,10 +2,6 @@
 
 A lightweight [Shared Signals Framework](https://openid.net/specs/openid-sharedsignals-framework-1_0.html) receiver that validates incoming Security Event Tokens (SETs) and forwards them to one or more sinks.
 
-- Push delivery only (no polling)
-- Single transmitter per config file
-- Optional request rewriting via Go templates
-
 ## Deployment
 
 For easy deployment, see the [Docker deployment guide](./docs/deployment/docker.md).
@@ -62,7 +58,7 @@ sinks:
 
 The service registers `public_url + endpoint` as the push delivery URL when it connects to the transmitter. Make sure that address is reachable by the transmitter.
 
-### Authentication
+### Transmitter authentication
 
 **Bearer token:**
 
@@ -107,11 +103,11 @@ The template has access to `.RawToken` (the raw JWT string) and `.Claims` (a map
 sinks:
   - type: webhook
     url: "https://webhook.example.com/events"
+    headers:
+      "Content-Type": "application/json"
     body_template: |
       {"token": "{{.RawToken}}", "issuer": "{{index .Claims "iss"}}"}
 ```
-
-When a `body_template` is set, the outgoing `Content-Type` is set to `application/json`.
 
 **Multiple sinks:**
 

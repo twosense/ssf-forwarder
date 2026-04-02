@@ -47,7 +47,7 @@ func NewWebhookSink(url string, headers map[string]string, bodyTemplate string) 
 }
 
 func (ws *WebhookSink) Send(ctx context.Context, rawToken []byte, incomingHeaders http.Header) error {
-	body, contentType, err := ws.buildBody(rawToken)
+	body, err := ws.buildBody(rawToken)
 	if err != nil {
 		return fmt.Errorf("building request body: %w", err)
 	}
@@ -59,10 +59,6 @@ func (ws *WebhookSink) Send(ctx context.Context, rawToken []byte, incomingHeader
 
 	if ct := incomingHeaders.Get("Content-Type"); ct != "" {
 		req.Header.Set("Content-Type", ct)
-	}
-
-	if contentType != "" {
-		req.Header.Set("Content-Type", contentType)
 	}
 
 	for k, v := range ws.headers {
@@ -84,9 +80,9 @@ func (ws *WebhookSink) Send(ctx context.Context, rawToken []byte, incomingHeader
 	return nil
 }
 
-func (ws *WebhookSink) buildBody(rawToken []byte) (body []byte, contentType string, err error) {
+func (ws *WebhookSink) buildBody(rawToken []byte) (body []byte, err error) {
 	if ws.bodyTemplate == nil {
-		return rawToken, "", nil
+		return rawToken, nil
 	}
 
 	claims := extractClaims(string(rawToken))
@@ -98,10 +94,10 @@ func (ws *WebhookSink) buildBody(rawToken []byte) (body []byte, contentType stri
 
 	var buf bytes.Buffer
 	if err := ws.bodyTemplate.Execute(&buf, data); err != nil {
-		return nil, "", fmt.Errorf("executing body_template: %w", err)
+		return nil, fmt.Errorf("executing body_template: %w", err)
 	}
 
-	return buf.Bytes(), "application/json", nil
+	return buf.Bytes(), nil
 }
 
 // extractClaims base64url-decodes the JWT payload without verifying the signature.

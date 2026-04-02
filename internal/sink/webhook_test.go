@@ -129,9 +129,6 @@ func TestWebhookSink_Send(t *testing.T) {
 				if string(body) != want {
 					t.Errorf("body = %q, want %q", body, want)
 				}
-				if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-					t.Errorf("Content-Type = %q, want application/json", ct)
-				}
 			},
 		},
 		{

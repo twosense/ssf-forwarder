@@ -30,6 +30,7 @@ sinks:
   - type: webhook
     url: "https://orchestrate-api.pingone.com/v1/company/<YOUR_COMPANY_ID>/policy/<YOUR_POLICY_ID>/start"
     headers:
+      "Content-Type": "application/json"
       "X-SK-API-KEY": "<YOUR_API_KEY>"
     body_template: |
       {"jwt": "{{.RawToken}}"}
