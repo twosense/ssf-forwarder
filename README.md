@@ -82,7 +82,7 @@ transmitter:
 
 ### Webhook sink options
 
-By default, the raw SET (the JWT string) is POST-ed to the webhook URL, with the original `Content-Type` header forwarded.
+By default, the raw SET (the JWT string) is POST-ed to the webhook URL, with the original `Content-Type` header forwarded. The request is retried up to three times with exponential backoff.
 
 **Add or override headers:**
 
