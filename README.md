@@ -165,3 +165,9 @@ go test -tags e2e -count 1 ./test/e2e/...
 ```
 
 The test builds the binary from source automatically — no extra setup required.
+
+You can also run the E2E tests against the built Docker image. This requires host networking, so it will only work on Linux:
+
+```sh
+E2E_DOCKER=1 go test -tags e2e -count 1 ./test/e2e/...
+```

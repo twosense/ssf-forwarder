@@ -25,25 +25,41 @@ import (
 	"time"
 )
 
-var binaryPath string
+const dockerImage = "ssf-forwarder:e2e-test"
+
+var (
+	binaryPath string
+	useDocker  = os.Getenv("E2E_DOCKER") == "1"
+)
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "ssf-forwarder-e2e-*")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "create temp dir: %v\n", err)
-		os.Exit(1)
-	}
+	var cleanup func()
 
-	binaryPath = filepath.Join(dir, "ssf-forwarder")
-	cmd := exec.Command("go", "build", "-o", binaryPath, "github.com/twosense/ssf-forwarder/cmd/ssf-forwarder")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		os.RemoveAll(dir)
-		fmt.Fprintf(os.Stderr, "binary build failed: %v\n%s\n", err, out)
-		os.Exit(1)
+	if useDocker {
+		cmd := exec.Command("docker", "build", "-t", dockerImage, "../..")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			fmt.Fprintf(os.Stderr, "docker build failed: %v\n%s\n", err, out)
+			os.Exit(1)
+		}
+		cleanup = func() {}
+	} else {
+		dir, err := os.MkdirTemp("", "ssf-forwarder-e2e-*")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "create temp dir: %v\n", err)
+			os.Exit(1)
+		}
+		binaryPath = filepath.Join(dir, "ssf-forwarder")
+		cmd := exec.Command("go", "build", "-o", binaryPath, "github.com/twosense/ssf-forwarder/cmd/ssf-forwarder")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			os.RemoveAll(dir)
+			fmt.Fprintf(os.Stderr, "binary build failed: %v\n%s\n", err, out)
+			os.Exit(1)
+		}
+		cleanup = func() { os.RemoveAll(dir) }
 	}
 
 	code := m.Run()
-	os.RemoveAll(dir)
+	cleanup()
 	os.Exit(code)
 }
 
@@ -263,12 +279,27 @@ func (ts *testSink) waitForToken(t *testing.T, timeout time.Duration) string {
 	return ts.tokens[len(ts.tokens)-1]
 }
 
-// startForwarder launches the ssf-forwarder binary with the given config file
-// and registers a cleanup function to send SIGTERM and wait for it to exit.
+// startForwarder launches the forwarder with the given config file and
+// registers a cleanup to send SIGTERM and wait for exit.
+//
+// In binary mode the compiled binary is run directly. In Docker mode
+// (E2E_DOCKER=1) the pre-built image is run with --network host so the
+// container shares the host's network stack and can reach 127.0.0.1 services.
+// Docker mode is only supported on Linux.
 func startForwarder(t *testing.T, configPath string) {
 	t.Helper()
 
-	cmd := exec.Command(binaryPath, "--config", configPath)
+	var cmd *exec.Cmd
+	if useDocker {
+		cmd = exec.Command("docker", "run", "--rm",
+			"--network", "host",
+			"-v", configPath+":/etc/ssf-forwarder/config.yaml:ro",
+			dockerImage,
+		)
+	} else {
+		cmd = exec.Command(binaryPath, "--config", configPath)
+	}
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
@@ -311,6 +342,7 @@ func freePort(t *testing.T) int {
 }
 
 // writeConfig writes a forwarder config.yaml to a temp file and returns its path.
+// The file is world-readable so the Docker container user can read it when mounted.
 func writeConfig(t *testing.T, metadataURL, sinkURL, publicURL, listenAddr string) string {
 	t.Helper()
 
@@ -342,6 +374,11 @@ sinks:
 		t.Fatalf("writing config: %v", err)
 	}
 	f.Close()
+
+	// World-readable so the container user (uid 1000) can read the mounted file.
+	if err := os.Chmod(f.Name(), 0644); err != nil {
+		t.Fatalf("chmod config: %v", err)
+	}
 
 	return f.Name()
 }
