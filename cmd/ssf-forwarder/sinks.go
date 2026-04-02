@@ -14,7 +14,7 @@ func buildSinks(sinkCfgs []config.SinkConfig) ([]sink.Sink, error) {
 	for i, sc := range sinkCfgs {
 		switch sc.Type {
 		case "webhook":
-			ws, err := sink.NewWebhookSink(sc.URL, sc.Headers, sc.BodyTemplate)
+			ws, err := sink.NewWebhookSink(sc.URL, sc.Headers, sc.BodyTemplate, slog.Default())
 			if err != nil {
 				return nil, fmt.Errorf("sinks[%d]: %w", i, err)
 			}
