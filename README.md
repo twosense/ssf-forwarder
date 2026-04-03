@@ -155,3 +155,19 @@ On shutdown (SIGINT/SIGTERM), the stream is deleted from the transmitter before 
 go test ./...
 go vet ./...
 ```
+
+### E2E tests
+
+The end-to-end tests in `test/e2e/` run the real compiled binary against an in-process fake transmitter and webhook sink. They are excluded from `go test ./...` by a build tag and must be run explicitly:
+
+```sh
+go test -tags e2e -count 1 ./test/e2e/...
+```
+
+The test builds the binary from source automatically — no extra setup required.
+
+You can also run the E2E tests against the built Docker image. This requires host networking, so it will only work on Linux:
+
+```sh
+E2E_DOCKER=1 go test -tags e2e -count 1 ./test/e2e/...
+```
