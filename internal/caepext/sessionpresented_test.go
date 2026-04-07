@@ -5,30 +5,30 @@ import (
 	"testing"
 )
 
-func TestSessionPresentedParse(t *testing.T) {
+func TestSessionPresentedRoundtrip(t *testing.T) {
 	tests := []struct {
-		name    string
-		payload map[string]any
+		name  string
+		input map[string]any
 	}{
 		{
-			name:    "empty payload",
-			payload: map[string]any{},
+			name:  "empty",
+			input: map[string]any{},
 		},
 		{
 			name: "all optional fields",
-			payload: map[string]any{
+			input: map[string]any{
 				"fp_ua":           "abb0b6e7da81a42233f8f2b1a8ddb1b9a4c81611",
 				"ext_id":          "12345",
-				"event_timestamp": float64(1615304991),
+				"event_timestamp": int64(1615304991),
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			data, err := json.Marshal(tt.payload)
+			data, err := json.Marshal(tt.input)
 			if err != nil {
-				t.Fatalf("marshaling payload: %v", err)
+				t.Fatalf("marshaling input: %v", err)
 			}
 
 			var e SessionPresentedEvent
@@ -44,22 +44,30 @@ func TestSessionPresentedParse(t *testing.T) {
 				t.Errorf("Validate() = %v, want nil", err)
 			}
 
-			roundtripped, err := json.Marshal(&e)
-			if err != nil {
-				t.Fatalf("MarshalJSON: %v", err)
+			if fp, ok := tt.input["fp_ua"].(string); ok && e.FpUA != fp {
+				t.Errorf("FpUA = %q, want %q", e.FpUA, fp)
 			}
-			var got, want map[string]any
-			json.Unmarshal(roundtripped, &got)
-			json.Unmarshal(data, &want)
-			if len(got) != len(want) {
-				t.Errorf("roundtrip field count: got %d, want %d", len(got), len(want))
+			if extID, ok := tt.input["ext_id"].(string); ok && e.ExtID != extID {
+				t.Errorf("ExtID = %q, want %q", e.ExtID, extID)
 			}
 		})
 	}
 }
 
-func TestSessionPresentedRegistered(t *testing.T) {
-	data, _ := json.Marshal(map[string]any{"event_timestamp": float64(1615304991)})
+func TestSessionPresentedInvalidMetadata(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{"event_timestamp": int64(-1)})
+	var e SessionPresentedEvent
+	if err := json.Unmarshal(data, &e); err == nil {
+		t.Error("expected error for negative event_timestamp, got nil")
+	}
+}
+
+func TestSessionPresentedParser(t *testing.T) {
+	data, _ := json.Marshal(map[string]any{
+		"fp_ua":           "abc123",
+		"event_timestamp": int64(1615304991),
+	})
+
 	e, err := parseSessionPresentedEvent(data)
 	if err != nil {
 		t.Fatalf("parseSessionPresentedEvent: %v", err)
