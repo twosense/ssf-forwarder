@@ -4,11 +4,16 @@ package caepext
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/sgnl-ai/caep.dev/secevent/pkg/event"
 )
 
 const EventTypeRiskLevelChange event.EventType = "https://schemas.openid.net/secevent/caep/event-type/risk-level-change"
+
+// validRiskLevels are the permitted values for current_level and previous_level
+// per Section 3.8.1 of the CAEP specification.
+var validRiskLevels = map[string]bool{"LOW": true, "MEDIUM": true, "HIGH": true}
 
 // RiskLevelChangeEvent represents a CAEP risk-level-change event.
 type RiskLevelChangeEvent struct {
@@ -17,6 +22,24 @@ type RiskLevelChangeEvent struct {
 }
 
 func (e *RiskLevelChangeEvent) Validate() error {
+	if _, ok := e.payload["principal"].(string); !ok {
+		return fmt.Errorf("risk-level-change: missing required claim: principal")
+	}
+
+	currentLevel, ok := e.payload["current_level"].(string)
+	if !ok {
+		return fmt.Errorf("risk-level-change: missing required claim: current_level")
+	}
+	if !validRiskLevels[currentLevel] {
+		return fmt.Errorf("risk-level-change: current_level must be LOW, MEDIUM, or HIGH; got %q", currentLevel)
+	}
+
+	if prevLevel, ok := e.payload["previous_level"].(string); ok {
+		if !validRiskLevels[prevLevel] {
+			return fmt.Errorf("risk-level-change: previous_level must be LOW, MEDIUM, or HIGH; got %q", prevLevel)
+		}
+	}
+
 	return nil
 }
 

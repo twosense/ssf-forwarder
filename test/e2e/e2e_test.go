@@ -257,8 +257,9 @@ func (ft *fakeTransmitter) signRiskLevelChangeSET(t *testing.T) string {
 		"iat": time.Now().Unix(),
 		"events": map[string]interface{}{
 			"https://schemas.openid.net/secevent/caep/event-type/risk-level-change": map[string]interface{}{
-				"current_level":   "medium",
-				"previous_level":  "low",
+				"current_level":   "MEDIUM",
+				"previous_level":  "LOW",
+				"principal":       "USER",
 				"event_timestamp": time.Now().UnixMilli(),
 			},
 		},
