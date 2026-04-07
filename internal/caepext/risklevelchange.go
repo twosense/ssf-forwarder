@@ -20,7 +20,7 @@ func (e *RiskLevelChangeEvent) Validate() error {
 	return nil
 }
 
-func (e *RiskLevelChangeEvent) Payload() interface{} {
+func (e *RiskLevelChangeEvent) Payload() any {
 	return e.payload
 }
 
