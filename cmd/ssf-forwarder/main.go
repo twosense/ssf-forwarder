@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	_ "github.com/twosense/ssf-forwarder/internal/caepext" // Register custom CAEP event parsers
 	"github.com/twosense/ssf-forwarder/internal/config"
 	"github.com/twosense/ssf-forwarder/internal/handler"
 )
