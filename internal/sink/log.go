@@ -2,8 +2,6 @@ package sink
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -21,20 +19,21 @@ func NewLogSink(logger *slog.Logger) *LogSink {
 func (ls *LogSink) Send(_ context.Context, rawToken []byte, _ http.Header) error {
 	claims := extractClaims(string(rawToken))
 
-	ls.logger.Info("received SET",
+	args := []any{
 		"issuer", stringClaim(claims, "iss"),
 		"jti", stringClaim(claims, "jti"),
-	)
-
-	if events, ok := claims["events"].(map[string]any); ok {
-		for et, data := range events {
-			fmt.Printf("  event: %s\n  claims:\n%s\n", et, prettyJSON(data, "    "))
-		}
+		"iat", claims["iat"],
 	}
 
-	if subID, ok := claims["sub_id"]; ok {
-		fmt.Printf("  subject:\n%s\n", prettyJSON(subID, "    "))
+	if txn := stringClaim(claims, "txn"); txn != "" {
+		args = append(args, "txn", txn)
 	}
+
+	if types := eventTypes(claims); len(types) > 0 {
+		args = append(args, "event_types", types)
+	}
+
+	ls.logger.Info("received SET", args...)
 
 	return nil
 }
@@ -45,14 +44,6 @@ func stringClaim(claims map[string]any, key string) string {
 	}
 	v, _ := claims[key].(string)
 	return v
-}
-
-func prettyJSON(v any, prefix string) string {
-	b, err := json.MarshalIndent(v, prefix, "  ")
-	if err != nil {
-		return fmt.Sprintf("%s%v", prefix, v)
-	}
-	return prefix + string(b)
 }
 
 func eventTypes(claims map[string]any) []string {
