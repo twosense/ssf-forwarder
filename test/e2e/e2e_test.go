@@ -205,10 +205,8 @@ func (ft *fakeTransmitter) getPushURL() string {
 	return ft.pushURL
 }
 
-// signSET returns a signed SSF verification SET as a JWT string.
-// The SET is valid for the forwarder to parse: correct issuer, a registered
-// event type, and a subject.
-func (ft *fakeTransmitter) signSET(t *testing.T) string {
+// signJWT signs a JWT with the given payload and returns the token string.
+func (ft *fakeTransmitter) signJWT(t *testing.T, payload map[string]interface{}) string {
 	t.Helper()
 
 	headerJSON, _ := json.Marshal(map[string]interface{}{
@@ -216,7 +214,27 @@ func (ft *fakeTransmitter) signSET(t *testing.T) string {
 		"kid": ft.kid,
 		"typ": "JWT",
 	})
-	payloadJSON, _ := json.Marshal(map[string]interface{}{
+	payloadJSON, _ := json.Marshal(payload)
+
+	h := base64.RawURLEncoding.EncodeToString(headerJSON)
+	p := base64.RawURLEncoding.EncodeToString(payloadJSON)
+	signingInput := h + "." + p
+
+	digest := sha256.Sum256([]byte(signingInput))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, ft.privateKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("signing JWT: %v", err)
+	}
+
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// signSET returns a signed SSF verification SET as a JWT string.
+// The SET is valid for the forwarder to parse: correct issuer, a registered
+// event type, and a subject.
+func (ft *fakeTransmitter) signSET(t *testing.T) string {
+	t.Helper()
+	return ft.signJWT(t, map[string]interface{}{
 		"iss": ft.issuer(),
 		"jti": fmt.Sprintf("e2e-%d", time.Now().UnixNano()),
 		"iat": time.Now().Unix(),
@@ -228,18 +246,27 @@ func (ft *fakeTransmitter) signSET(t *testing.T) string {
 			"email":  "test@example.com",
 		},
 	})
+}
 
-	h := base64.RawURLEncoding.EncodeToString(headerJSON)
-	p := base64.RawURLEncoding.EncodeToString(payloadJSON)
-	signingInput := h + "." + p
-
-	digest := sha256.Sum256([]byte(signingInput))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, ft.privateKey, crypto.SHA256, digest[:])
-	if err != nil {
-		t.Fatalf("signing SET: %v", err)
-	}
-
-	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+// signRiskLevelChangeSET returns a signed CAEP risk-level-change SET as a JWT string.
+func (ft *fakeTransmitter) signRiskLevelChangeSET(t *testing.T) string {
+	t.Helper()
+	return ft.signJWT(t, map[string]interface{}{
+		"iss": ft.issuer(),
+		"jti": fmt.Sprintf("e2e-%d", time.Now().UnixNano()),
+		"iat": time.Now().Unix(),
+		"events": map[string]interface{}{
+			"https://schemas.openid.net/secevent/caep/event-type/risk-level-change": map[string]interface{}{
+				"current_level":  "medium",
+				"previous_level": "low",
+				"event_timestamp": time.Now().UnixMilli(),
+			},
+		},
+		"sub_id": map[string]interface{}{
+			"format": "email",
+			"email":  "test@example.com",
+		},
+	})
 }
 
 // testSink is an HTTP server that records the raw bodies of all POST requests.
@@ -343,8 +370,13 @@ func freePort(t *testing.T) int {
 
 // writeConfig writes a forwarder config.yaml to a temp file and returns its path.
 // The file is world-readable so the Docker container user can read it when mounted.
-func writeConfig(t *testing.T, metadataURL, sinkURL, publicURL, listenAddr string) string {
+func writeConfig(t *testing.T, metadataURL, sinkURL, publicURL, listenAddr string, eventTypes []string) string {
 	t.Helper()
+
+	var eventsBlock strings.Builder
+	for _, et := range eventTypes {
+		fmt.Fprintf(&eventsBlock, "    - %s\n", et)
+	}
 
 	content := fmt.Sprintf(`receiver:
   public_url: %q
@@ -357,12 +389,11 @@ transmitter:
     type: bearer
     token: test-token
   events_requested:
-    - https://schemas.openid.net/secevent/ssf/event-type/verification
-
+%s
 sinks:
   - type: webhook
     url: %q
-`, publicURL, listenAddr, metadataURL, sinkURL)
+`, publicURL, listenAddr, metadataURL, eventsBlock.String(), sinkURL)
 
 	f, err := os.CreateTemp("", "ssf-forwarder-config-*.yaml")
 	if err != nil {
@@ -396,6 +427,7 @@ func TestForwardsSETToWebhookSink(t *testing.T) {
 		sink.server.URL,
 		publicURL,
 		listenAddr,
+		[]string{"https://schemas.openid.net/secevent/ssf/event-type/verification"},
 	)
 
 	startForwarder(t, cfgPath)
@@ -409,6 +441,50 @@ func TestForwardsSETToWebhookSink(t *testing.T) {
 	waitForServer(t, publicURL+"/events", 5*time.Second)
 
 	token := transmitter.signSET(t)
+
+	resp, err := http.Post(
+		transmitter.getPushURL(),
+		"application/secevent+jwt",
+		strings.NewReader(token),
+	)
+	if err != nil {
+		t.Fatalf("pushing SET to forwarder: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("forwarder returned %d, want 202", resp.StatusCode)
+	}
+
+	received := sink.waitForToken(t, 5*time.Second)
+
+	if received != token {
+		t.Errorf("sink received unexpected token\ngot:  %s\nwant: %s", received, token)
+	}
+}
+
+func TestForwardsRiskLevelChangeSETToWebhookSink(t *testing.T) {
+	transmitter := newFakeTransmitter(t)
+	sink := newTestSink(t)
+
+	port := freePort(t)
+	listenAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	publicURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+
+	cfgPath := writeConfig(t,
+		transmitter.server.URL+"/metadata",
+		sink.server.URL,
+		publicURL,
+		listenAddr,
+		[]string{"https://schemas.openid.net/secevent/caep/event-type/risk-level-change"},
+	)
+
+	startForwarder(t, cfgPath)
+
+	transmitter.waitForRegistration(t, 15*time.Second)
+	waitForServer(t, publicURL+"/events", 5*time.Second)
+
+	token := transmitter.signRiskLevelChangeSET(t)
 
 	resp, err := http.Post(
 		transmitter.getPushURL(),
