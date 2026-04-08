@@ -22,10 +22,10 @@ docker run --rm \
 
 ## Docker Compose
 
-Copy the sample config and fill in your values:
+Copy the example config and fill in your values:
 
 ```sh
-cp config.sample.yaml config.yaml
+cp config.example.yaml config.yaml
 ```
 
 Then start the service:

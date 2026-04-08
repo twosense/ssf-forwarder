@@ -149,6 +149,23 @@ On startup, the service:
 
 On shutdown (SIGINT/SIGTERM), the stream is deleted from the transmitter before the process exits.
 
+## Supported Events
+
+`ssf-forwarder` supports all CAEP event types defined in the [CAEP specification](https://openid.net/specs/openid-caep-1_0.html).
+
+| Event type | URI |
+|---|---|
+| Session Revoked | `https://schemas.openid.net/secevent/caep/event-type/session-revoked` |
+| Token Claims Change | `https://schemas.openid.net/secevent/caep/event-type/token-claims-change` |
+| Credential Change | `https://schemas.openid.net/secevent/caep/event-type/credential-change` |
+| Assurance Level Change | `https://schemas.openid.net/secevent/caep/event-type/assurance-level-change` |
+| Device Compliance Change | `https://schemas.openid.net/secevent/caep/event-type/device-compliance-change` |
+| Session Established | `https://schemas.openid.net/secevent/caep/event-type/session-established` |
+| Session Presented | `https://schemas.openid.net/secevent/caep/event-type/session-presented` |
+| Risk Level Change | `https://schemas.openid.net/secevent/caep/event-type/risk-level-change` |
+| Verification | `https://schemas.openid.net/secevent/ssf/event-type/verification` |
+| Stream Updated | `https://schemas.openid.net/secevent/ssf/event-type/stream-updated` |
+
 ## Development
 
 ```sh

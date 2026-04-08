@@ -1,6 +1,9 @@
 services:
   ssf-forwarder:
-    image: ghcr.io/twosense/ssf-forwarder:latest
+    # In a production environment, you will want to reference the image directly:
+    # image: ghcr.io/twosense/ssf-forwarder:latest
+    # For development, you can build the image locally:
+    build: .
     ports:
       - "8080:8080"
     volumes:

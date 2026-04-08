@@ -319,12 +319,12 @@ func (t *sequencedTransport) RoundTrip(_ *http.Request) (*http.Response, error) 
 
 func TestWebhookSink_Retry_Boundaries(t *testing.T) {
 	tests := []struct {
-		name        string
-		responses   []int
-		maxRetries  int
-		wantErr     bool
-		wantReqs    int
-		wantSleeps  int
+		name       string
+		responses  []int
+		maxRetries int
+		wantErr    bool
+		wantReqs   int
+		wantSleeps int
 	}{
 		{
 			name:       "succeeds on last allowed attempt",
