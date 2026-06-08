@@ -3,6 +3,7 @@ module github.com/twosense/ssf-forwarder
 go 1.26.1
 
 require (
+	github.com/expr-lang/expr v1.17.8
 	github.com/sgnl-ai/caep.dev/secevent v0.0.0-20260324042446-766e4de83f33
 	github.com/sgnl-ai/caep.dev/ssfreceiver v0.0.0-20260324042446-766e4de83f33
 	golang.org/x/oauth2 v0.33.0

@@ -405,6 +405,42 @@ sinks:
 			},
 		},
 		{
+			name: "sink with filters list",
+			yaml: `
+receiver:
+  public_url: "https://receiver.example.com"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+sinks:
+  - type: webhook
+    url: "https://webhook.example.com/events"
+    filters:
+      - 'event_type == "https://schemas.openid.net/secevent/caep/event-type/session-revoked"'
+      - 'claims.iss == "https://idp.example.com/"'
+`,
+			check: func(t *testing.T, c *Config) {
+				if len(c.Sinks) != 1 {
+					t.Fatalf("len(Sinks) = %d, want 1", len(c.Sinks))
+				}
+				want := []string{
+					`event_type == "https://schemas.openid.net/secevent/caep/event-type/session-revoked"`,
+					`claims.iss == "https://idp.example.com/"`,
+				}
+				got := c.Sinks[0].Filters
+				if len(got) != len(want) {
+					t.Fatalf("len(Filters) = %d, want %d", len(got), len(want))
+				}
+				for i, w := range want {
+					if got[i] != w {
+						t.Errorf("Filters[%d] = %q, want %q", i, got[i], w)
+					}
+				}
+			},
+		},
+		{
 			name: "unsupported sink type",
 			yaml: `
 receiver:

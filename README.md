@@ -111,7 +111,7 @@ sinks:
 
 **Multiple sinks:**
 
-All sinks receive every event. Delivery to each sink is attempted concurrently.
+By default, all sinks receive every event (see [Filtering events](#filtering-events) to scope a sink to a subset). Delivery to each sink is attempted concurrently.
 
 ```yaml
 sinks:
@@ -133,6 +133,36 @@ sinks:
 ```
 
 Each event is logged with the following fields: `issuer`, `jti`, `iat`, `event_types`, and `txn` (if present).
+
+### Filtering events
+
+By default, every sink receives every event. Add a `filters` list to a sink to forward only the events it should receive. Each filter is an [`expr`](https://expr-lang.org/) expression that must evaluate to a boolean, and a SET is forwarded to the sink only if **all** of its filters return `true`. A sink with no `filters` (or an empty list) receives everything.
+
+Each expression is evaluated against three variables:
+
+| Variable | Type | Description |
+|---|---|---|
+| `event_type` | string | The event's type URI (the key under the SET's `events` claim) |
+| `event` | map | The event's payload, e.g. `event.current_level` |
+| `claims` | map | The full decoded SET, e.g. `claims.iss`, `claims.sub_id.sub` |
+
+For example, to forward only risk-level-change events where the risk level is `HIGH` to a webhook, while still logging everything:
+
+```yaml
+sinks:
+  - type: webhook
+    url: "https://davinci.example.com/events"
+    filters:
+      - 'event_type == "https://schemas.openid.net/secevent/caep/event-type/risk-level-change"'
+      - 'event.current_level == "HIGH"'
+  - type: log   # no filters: receives every event
+```
+
+Filters within a sink are evaluated in order and short-circuit at the first one that returns `false`, so put the `event_type` check first.
+
+A SET almost always carries a single event. In the rare case one carries multiple, `event` and `event_type` are unavailable (a warning is logged) — use `claims.events` to address them directly.
+
+Filters are compiled when the config loads, so a malformed expression, or one that doesn't return a boolean, fails startup. At runtime a missing field evaluates to `false` rather than erroring; if a filter references a field that isn't present in the SET, a warning is logged so a typo'd path doesn't silently drop events.
 
 ## Usage
 

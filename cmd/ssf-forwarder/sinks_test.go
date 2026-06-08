@@ -5,14 +5,16 @@ import (
 	"testing"
 
 	"github.com/twosense/ssf-forwarder/internal/config"
+	"github.com/twosense/ssf-forwarder/internal/sink"
 )
 
 func TestBuildSinks(t *testing.T) {
 	tests := []struct {
-		name    string
-		cfgs    []config.SinkConfig
-		wantN   int
-		wantErr string
+		name        string
+		cfgs        []config.SinkConfig
+		wantN       int
+		wantErr     string
+		wantWrapped bool // expect sinks[0] to be a *sink.FilteredSink
 	}{
 		{
 			name:  "webhook sink",
@@ -47,6 +49,34 @@ func TestBuildSinks(t *testing.T) {
 			cfgs:  nil,
 			wantN: 0,
 		},
+		{
+			name: "webhook with valid filter wraps sink",
+			cfgs: []config.SinkConfig{{
+				Type:    "webhook",
+				URL:     "https://example.com/hook",
+				Filters: []string{`event_type == "https://schemas.openid.net/secevent/caep/event-type/session-revoked"`},
+			}},
+			wantN:       1,
+			wantWrapped: true,
+		},
+		{
+			name: "webhook with invalid filter returns error",
+			cfgs: []config.SinkConfig{{
+				Type:    "webhook",
+				URL:     "https://example.com/hook",
+				Filters: []string{"event_type =="},
+			}},
+			wantErr: "sinks[0]",
+		},
+		{
+			name: "log sink with valid filter wraps sink",
+			cfgs: []config.SinkConfig{{
+				Type:    "log",
+				Filters: []string{`event_type == "https://schemas.openid.net/secevent/caep/event-type/session-revoked"`},
+			}},
+			wantN:       1,
+			wantWrapped: true,
+		},
 	}
 
 	for _, tc := range tests {
@@ -71,6 +101,11 @@ func TestBuildSinks(t *testing.T) {
 			}
 			if len(sinks) != tc.wantN {
 				t.Errorf("len(sinks) = %d, want %d", len(sinks), tc.wantN)
+			}
+			if tc.wantWrapped && len(sinks) > 0 {
+				if _, ok := sinks[0].(*sink.FilteredSink); !ok {
+					t.Errorf("expected sinks[0] to be *sink.FilteredSink, got %T", sinks[0])
+				}
 			}
 		})
 	}

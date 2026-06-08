@@ -40,6 +40,7 @@ type SinkConfig struct {
 	URL          string            `yaml:"url"`
 	Headers      map[string]string `yaml:"headers"`
 	BodyTemplate string            `yaml:"body_template"`
+	Filters      []string          `yaml:"filters"`
 }
 
 func Load(path string) (*Config, error) {

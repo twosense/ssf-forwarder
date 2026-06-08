@@ -249,7 +249,8 @@ func (ft *fakeTransmitter) signSET(t *testing.T) string {
 }
 
 // signRiskLevelChangeSET returns a signed CAEP risk-level-change SET as a JWT string.
-func (ft *fakeTransmitter) signRiskLevelChangeSET(t *testing.T) string {
+// currentLevel is used as the current_level claim (e.g. "HIGH", "MEDIUM", "LOW").
+func (ft *fakeTransmitter) signRiskLevelChangeSET(t *testing.T, currentLevel string) string {
 	t.Helper()
 	return ft.signJWT(t, map[string]interface{}{
 		"iss": ft.issuer(),
@@ -257,7 +258,7 @@ func (ft *fakeTransmitter) signRiskLevelChangeSET(t *testing.T) string {
 		"iat": time.Now().Unix(),
 		"events": map[string]interface{}{
 			"https://schemas.openid.net/secevent/caep/event-type/risk-level-change": map[string]interface{}{
-				"current_level":   "MEDIUM",
+				"current_level":   currentLevel,
 				"previous_level":  "LOW",
 				"principal":       "USER",
 				"event_timestamp": time.Now().UnixMilli(),
@@ -305,6 +306,15 @@ func (ts *testSink) waitForToken(t *testing.T, timeout time.Duration) string {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 	return ts.tokens[len(ts.tokens)-1]
+}
+
+func (ts *testSink) expectNoToken(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-ts.ch:
+		t.Fatal("test sink received a token but expected none (SET should have been filtered out)")
+	case <-time.After(timeout):
+	}
 }
 
 // startForwarder launches the forwarder with the given config file and
@@ -371,12 +381,21 @@ func freePort(t *testing.T) int {
 
 // writeConfig writes a forwarder config.yaml to a temp file and returns its path.
 // The file is world-readable so the Docker container user can read it when mounted.
-func writeConfig(t *testing.T, metadataURL, sinkURL, publicURL, listenAddr string, eventTypes []string) string {
+// When filters is non-empty, a filters block is appended under the webhook sink.
+func writeConfig(t *testing.T, metadataURL, sinkURL, publicURL, listenAddr string, eventTypes []string, filters []string) string {
 	t.Helper()
 
 	var eventsBlock strings.Builder
 	for _, et := range eventTypes {
 		fmt.Fprintf(&eventsBlock, "    - %s\n", et)
+	}
+
+	var filtersBlock strings.Builder
+	if len(filters) > 0 {
+		filtersBlock.WriteString("    filters:\n")
+		for _, f := range filters {
+			fmt.Fprintf(&filtersBlock, "      - '%s'\n", f)
+		}
 	}
 
 	content := fmt.Sprintf(`receiver:
@@ -394,7 +413,7 @@ transmitter:
 sinks:
   - type: webhook
     url: %q
-`, publicURL, listenAddr, metadataURL, eventsBlock.String(), sinkURL)
+%s`, publicURL, listenAddr, metadataURL, eventsBlock.String(), sinkURL, filtersBlock.String())
 
 	f, err := os.CreateTemp("", "ssf-forwarder-config-*.yaml")
 	if err != nil {
@@ -429,6 +448,7 @@ func TestForwardsSETToWebhookSink(t *testing.T) {
 		publicURL,
 		listenAddr,
 		[]string{"https://schemas.openid.net/secevent/ssf/event-type/verification"},
+		nil,
 	)
 
 	startForwarder(t, cfgPath)
@@ -478,6 +498,7 @@ func TestForwardsRiskLevelChangeSETToWebhookSink(t *testing.T) {
 		publicURL,
 		listenAddr,
 		[]string{"https://schemas.openid.net/secevent/caep/event-type/risk-level-change"},
+		nil,
 	)
 
 	startForwarder(t, cfgPath)
@@ -485,7 +506,7 @@ func TestForwardsRiskLevelChangeSETToWebhookSink(t *testing.T) {
 	transmitter.waitForRegistration(t, 15*time.Second)
 	waitForServer(t, publicURL+"/events", 5*time.Second)
 
-	token := transmitter.signRiskLevelChangeSET(t)
+	token := transmitter.signRiskLevelChangeSET(t, "MEDIUM")
 
 	resp, err := http.Post(
 		transmitter.getPushURL(),
@@ -506,4 +527,70 @@ func TestForwardsRiskLevelChangeSETToWebhookSink(t *testing.T) {
 	if received != token {
 		t.Errorf("sink received unexpected token\ngot:  %s\nwant: %s", received, token)
 	}
+}
+
+func TestFilterForwardsOnlyHighRiskLevelChange(t *testing.T) {
+	transmitter := newFakeTransmitter(t)
+	sink := newTestSink(t)
+
+	port := freePort(t)
+	listenAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	publicURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+
+	cfgPath := writeConfig(t,
+		transmitter.server.URL+"/metadata",
+		sink.server.URL,
+		publicURL,
+		listenAddr,
+		[]string{"https://schemas.openid.net/secevent/caep/event-type/risk-level-change"},
+		[]string{
+			`event_type == "https://schemas.openid.net/secevent/caep/event-type/risk-level-change"`,
+			`event.current_level == "HIGH"`,
+		},
+	)
+
+	startForwarder(t, cfgPath)
+	transmitter.waitForRegistration(t, 15*time.Second)
+	waitForServer(t, publicURL+"/events", 5*time.Second)
+
+	// Push a HIGH risk-level-change SET — the filter should pass and forward it.
+	highToken := transmitter.signRiskLevelChangeSET(t, "HIGH")
+
+	resp, err := http.Post(
+		transmitter.getPushURL(),
+		"application/secevent+jwt",
+		strings.NewReader(highToken),
+	)
+	if err != nil {
+		t.Fatalf("pushing HIGH SET to forwarder: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("forwarder returned %d, want 202 (HIGH SET)", resp.StatusCode)
+	}
+
+	received := sink.waitForToken(t, 5*time.Second)
+	if received != highToken {
+		t.Errorf("sink received unexpected token for HIGH SET\ngot:  %s\nwant: %s", received, highToken)
+	}
+
+	// Push a LOW risk-level-change SET — the filter should drop it (current_level != "HIGH").
+	lowToken := transmitter.signRiskLevelChangeSET(t, "LOW")
+
+	resp, err = http.Post(
+		transmitter.getPushURL(),
+		"application/secevent+jwt",
+		strings.NewReader(lowToken),
+	)
+	if err != nil {
+		t.Fatalf("pushing LOW SET to forwarder: %v", err)
+	}
+	resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		t.Fatalf("forwarder returned %d, want 202 (LOW SET)", resp.StatusCode)
+	}
+
+	sink.expectNoToken(t, 2*time.Second)
 }
