@@ -53,7 +53,13 @@ func runServe(cfg *config.Config) {
 			os.Exit(1)
 		}
 		registeredStreamID = stream.StreamID
-		slog.Info("stream registration reconciled", "action", action, "stream_id", stream.StreamID, "push_url", pushURL)
+
+		if action == ssfadmin.ActionCreated {
+			slog.Info("stream registered", "stream_id", stream.StreamID, "push_url", pushURL)
+		} else {
+			slog.Warn("found an existing stream on boot; a previous run may have shut down uncleanly, or another instance is already registered. to run multiple instances, disable auto_register and manage the stream with the register/deregister commands.",
+				"action", action, "stream_id", stream.StreamID, "push_url", pushURL)
+		}
 	} else {
 		runBootSafeguard(ctx, client, pushURL)
 	}

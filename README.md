@@ -175,7 +175,7 @@ The `--config` flag defaults to `config.yaml` in the current directory.
 
 On startup, the service:
 1. Fetches transmitter metadata from `metadata_url`
-2. If `auto_register` is `true` (the default), registers a push stream with the transmitter (or reuses an existing one)
+2. If `auto_register` is `true` (the default), registers a push stream with the transmitter. If one is already registered it reuses that stream and logs a warning, since that usually means either a previous run shut down uncleanly or another instance is already running
 3. Starts listening for incoming SETs
 
 On shutdown (SIGINT/SIGTERM), if `auto_register` is `true`, the stream is deleted from the transmitter before the process exits.
@@ -190,7 +190,7 @@ On shutdown (SIGINT/SIGTERM), if `auto_register` is `true`, the stream is delete
 
 ### Running multiple instances (horizontal scaling)
 
-Point a load balancer at every instance and use its address as the shared `public_url`. Opt every instance out of boot registration:
+Point a load balancer at every instance and use its address as the shared `public_url`. Opt every instance out of boot registration — leave even one instance auto-registering and it will delete the shared stream when it shuts down or restarts, cutting off delivery to the others:
 
 ```yaml
 receiver:
