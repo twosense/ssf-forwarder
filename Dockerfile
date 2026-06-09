@@ -18,5 +18,6 @@ USER app
 
 COPY --from=builder /ssf-forwarder /usr/local/bin/ssf-forwarder
 
+ENV SSF_FORWARDER_CONFIG_PATH=/etc/ssf-forwarder/config.yaml
+
 ENTRYPOINT ["ssf-forwarder"]
-CMD ["--config", "/etc/ssf-forwarder/config.yaml"]
