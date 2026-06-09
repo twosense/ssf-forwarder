@@ -41,6 +41,7 @@ receiver:
   public_url: "https://receiver.example.com"   # externally reachable URL for this service
   listen_addr: ":8080"                         # default: :8080
   endpoint: "/events"                          # default: /events
+  auto_register: true                          # default: true; set false to manage stream registration out of band
 
 transmitter:
   metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
@@ -174,10 +175,36 @@ The `--config` flag defaults to `config.yaml` in the current directory.
 
 On startup, the service:
 1. Fetches transmitter metadata from `metadata_url`
-2. Registers a push stream with the transmitter (or reuses an existing one)
+2. If `auto_register` is `true` (the default), registers a push stream with the transmitter (or reuses an existing one)
 3. Starts listening for incoming SETs
 
-On shutdown (SIGINT/SIGTERM), the stream is deleted from the transmitter before the process exits.
+On shutdown (SIGINT/SIGTERM), if `auto_register` is `true`, the stream is deleted from the transmitter before the process exits.
+
+### Subcommands
+
+**`ssf-forwarder register`** — registers (or updates) the stream for `public_url + endpoint`. Idempotent; safe to re-run. Re-run after changing `public_url` or `events_requested` to update the existing stream in place.
+
+**`ssf-forwarder deregister`** — deletes the stream. Idempotent.
+
+**`ssf-forwarder` / `ssf-forwarder serve`** — runs the receiver (default).
+
+### Running multiple instances (horizontal scaling)
+
+Point a load balancer at every instance and use its address as the shared `public_url`. Opt every instance out of boot registration:
+
+```yaml
+receiver:
+  public_url: "https://ssf-forwarder.example.com"  # the load balancer
+  auto_register: false
+```
+
+Register the stream once during provisioning (safe to re-run; updates in place if the URL or event types changed):
+
+```sh
+ssf-forwarder register
+```
+
+Then start the instances normally (`ssf-forwarder`). Each warns on boot if no stream is registered for its `public_url`, but keeps serving. To tear the integration down, run `ssf-forwarder deregister` once.
 
 ## Supported Events
 
