@@ -85,3 +85,41 @@ func sameEventSet(a, b []string) bool {
 	}
 	return true
 }
+
+// SafeguardStatus is the outcome of a boot-time registration check.
+type SafeguardStatus string
+
+const (
+	SafeguardOK          SafeguardStatus = "ok"
+	SafeguardMissing     SafeguardStatus = "missing"
+	SafeguardURLMismatch SafeguardStatus = "url_mismatch"
+)
+
+// SafeguardResult is the result of Check. RegisteredURL is set only when the
+// status is SafeguardURLMismatch.
+type SafeguardResult struct {
+	Status        SafeguardStatus
+	RegisteredURL string
+}
+
+// Check reports whether a stream owned by ssf-forwarder is registered for the
+// given push URL. It never mutates state.
+func Check(ctx context.Context, c *Client, pushURL string) (SafeguardResult, error) {
+	streams, err := c.List(ctx)
+	if err != nil {
+		return SafeguardResult{}, err
+	}
+
+	existing, err := FindOurStream(streams)
+	if err != nil {
+		return SafeguardResult{}, err
+	}
+
+	if existing == nil {
+		return SafeguardResult{Status: SafeguardMissing}, nil
+	}
+	if existing.Delivery.EndpointURL != pushURL {
+		return SafeguardResult{Status: SafeguardURLMismatch, RegisteredURL: existing.Delivery.EndpointURL}, nil
+	}
+	return SafeguardResult{Status: SafeguardOK}, nil
+}

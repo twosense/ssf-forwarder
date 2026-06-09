@@ -113,3 +113,52 @@ func TestReconcileUpdatesOnURLChange(t *testing.T) {
 		t.Fatalf("updated endpoint: %q", stream.Delivery.EndpointURL)
 	}
 }
+
+func TestCheck(t *testing.T) {
+	cases := []struct {
+		name    string
+		streams []StreamConfig
+		pushURL string
+		want    SafeguardStatus
+		wantURL string
+	}{
+		{
+			name:    "ok",
+			streams: []StreamConfig{{StreamID: "1", Description: StreamDescription, Delivery: DeliveryConfig{EndpointURL: "https://lb/events"}}},
+			pushURL: "https://lb/events",
+			want:    SafeguardOK,
+		},
+		{
+			name:    "missing",
+			streams: []StreamConfig{{StreamID: "2", Description: "not-ours", Delivery: DeliveryConfig{EndpointURL: "https://lb/events"}}},
+			pushURL: "https://lb/events",
+			want:    SafeguardMissing,
+		},
+		{
+			name:    "url mismatch",
+			streams: []StreamConfig{{StreamID: "1", Description: StreamDescription, Delivery: DeliveryConfig{EndpointURL: "https://old/events"}}},
+			pushURL: "https://lb/events",
+			want:    SafeguardURLMismatch,
+			wantURL: "https://old/events",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			streams := tc.streams
+			srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+				_ = json.NewEncoder(w).Encode(streams)
+			})
+			c := testClient(t, srv)
+			res, err := Check(context.Background(), c, tc.pushURL)
+			if err != nil {
+				t.Fatalf("Check: %v", err)
+			}
+			if res.Status != tc.want {
+				t.Fatalf("status: got %q want %q", res.Status, tc.want)
+			}
+			if res.RegisteredURL != tc.wantURL {
+				t.Fatalf("registered url: got %q want %q", res.RegisteredURL, tc.wantURL)
+			}
+		})
+	}
+}
