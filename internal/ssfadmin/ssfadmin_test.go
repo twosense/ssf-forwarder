@@ -184,3 +184,34 @@ func TestDeleteSendsStreamID(t *testing.T) {
 		t.Fatalf("delete stream_id: got %q", gotQuery)
 	}
 }
+
+func TestDeleteEncodesStreamID(t *testing.T) {
+	var gotQuery string
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method: got %s want DELETE", r.Method)
+		}
+		gotQuery = r.URL.Query().Get("stream_id")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	c := testClient(t, srv)
+	if err := c.Delete(context.Background(), "a/b c"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if gotQuery != "a/b c" {
+		t.Fatalf("delete stream_id round-trip: got %q want %q", gotQuery, "a/b c")
+	}
+}
+
+func TestDeleteTreats404AsSuccess(t *testing.T) {
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method: got %s want DELETE", r.Method)
+		}
+		w.WriteHeader(http.StatusNotFound)
+	})
+	c := testClient(t, srv)
+	if err := c.Delete(context.Background(), "gone"); err != nil {
+		t.Fatalf("Delete returned error on 404, want nil: %v", err)
+	}
+}

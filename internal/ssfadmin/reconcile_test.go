@@ -114,6 +114,29 @@ func TestReconcileUpdatesOnURLChange(t *testing.T) {
 	}
 }
 
+func TestReconcileNoopWhenTransmitterOmitsEvents(t *testing.T) {
+	existing := StreamConfig{
+		StreamID:        "x",
+		Description:     StreamDescription,
+		Delivery:        DeliveryConfig{Method: "urn:ietf:rfc:8935", EndpointURL: "https://lb/events"},
+		EventsRequested: nil, // transmitter did not echo events_requested
+	}
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected method %s; reconcile must not write when transmitter omits events_requested", r.Method)
+		}
+		_ = json.NewEncoder(w).Encode([]StreamConfig{existing})
+	})
+	c := testClient(t, srv)
+	action, _, err := Reconcile(context.Background(), c, "https://lb/events", []string{"e1", "e2"})
+	if err != nil {
+		t.Fatalf("Reconcile: %v", err)
+	}
+	if action != ActionUnchanged {
+		t.Fatalf("action: got %q want unchanged", action)
+	}
+}
+
 func TestCheck(t *testing.T) {
 	cases := []struct {
 		name    string

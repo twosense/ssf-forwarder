@@ -61,7 +61,12 @@ func Reconcile(ctx context.Context, c *Client, pushURL string, eventTypes []stri
 		return ActionCreated, created, err
 	}
 
-	if existing.Delivery.EndpointURL == pushURL && sameEventSet(existing.EventsRequested, eventTypes) {
+	// A transmitter may omit events_requested when returning a stream
+	// configuration (the spec only requires events_delivered). When it does,
+	// we can't meaningfully compare event types, so we only reconcile the URL
+	// to avoid issuing a pointless update on every run.
+	eventsMatch := len(existing.EventsRequested) == 0 || sameEventSet(existing.EventsRequested, eventTypes)
+	if existing.Delivery.EndpointURL == pushURL && eventsMatch {
 		return ActionUnchanged, existing, nil
 	}
 

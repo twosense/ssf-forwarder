@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/sgnl-ai/caep.dev/ssfreceiver/auth"
@@ -169,8 +170,8 @@ func (c *Client) Update(ctx context.Context, cfg StreamConfig) (*StreamConfig, e
 
 // Delete removes the stream with the given ID.
 func (c *Client) Delete(ctx context.Context, streamID string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
-		fmt.Sprintf("%s?stream_id=%s", c.configEndpoint, streamID), nil)
+	deleteURL := c.configEndpoint + "?" + url.Values{"stream_id": {streamID}}.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
 	if err != nil {
 		return fmt.Errorf("creating delete request: %w", err)
 	}
@@ -184,7 +185,7 @@ func (c *Client) Delete(ctx context.Context, streamID string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusNotFound {
 		return statusError("delete", resp)
 	}
 	return nil
