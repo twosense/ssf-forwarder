@@ -125,6 +125,84 @@ func (c *Client) List(ctx context.Context) ([]StreamConfig, error) {
 	return []StreamConfig{single}, nil
 }
 
+// Create registers a new stream.
+func (c *Client) Create(ctx context.Context, cfg StreamConfig) (*StreamConfig, error) {
+	cfg.StreamID = "" // never send stream_id on create
+	body, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling create body: %w", err)
+	}
+
+	resp, err := c.doJSON(ctx, http.MethodPost, body)
+	if err != nil {
+		return nil, fmt.Errorf("creating stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, statusError("create", resp)
+	}
+	return decodeStream(resp)
+}
+
+// Update changes an existing stream in place. cfg.StreamID must be set.
+func (c *Client) Update(ctx context.Context, cfg StreamConfig) (*StreamConfig, error) {
+	if cfg.StreamID == "" {
+		return nil, fmt.Errorf("update requires a stream_id")
+	}
+	body, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling update body: %w", err)
+	}
+
+	resp, err := c.doJSON(ctx, http.MethodPut, body)
+	if err != nil {
+		return nil, fmt.Errorf("updating stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, statusError("update", resp)
+	}
+	return decodeStream(resp)
+}
+
+// Delete removes the stream with the given ID.
+func (c *Client) Delete(ctx context.Context, streamID string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
+		fmt.Sprintf("%s?stream_id=%s", c.configEndpoint, streamID), nil)
+	if err != nil {
+		return fmt.Errorf("creating delete request: %w", err)
+	}
+	if err := c.authorizer.AddAuth(ctx, req); err != nil {
+		return fmt.Errorf("adding auth: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("deleting stream: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		return statusError("delete", resp)
+	}
+	return nil
+}
+
+func decodeStream(resp *http.Response) (*StreamConfig, error) {
+	var cfg StreamConfig
+	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("decoding stream configuration: %w", err)
+	}
+	return &cfg, nil
+}
+
+func statusError(op string, resp *http.Response) error {
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("%s request failed with status %d: %s", op, resp.StatusCode, string(body))
+}
+
 func (c *Client) doJSON(ctx context.Context, method string, body []byte) (*http.Response, error) {
 	var reader io.Reader
 	if body != nil {

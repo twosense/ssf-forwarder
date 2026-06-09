@@ -101,3 +101,86 @@ func TestListEmpty(t *testing.T) {
 		t.Fatalf("expected no streams, got %+v", streams)
 	}
 }
+
+func TestCreatePostsRequestAndDecodes(t *testing.T) {
+	var gotBody StreamConfig
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("method: got %s want POST", r.Method)
+		}
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"stream_id":   "new-id",
+			"description": StreamDescription,
+			"delivery":    map[string]any{"method": "urn:ietf:rfc:8935", "endpoint_url": gotBody.Delivery.EndpointURL},
+		})
+	})
+	c := testClient(t, srv)
+	out, err := c.Create(context.Background(), StreamConfig{
+		Description:     StreamDescription,
+		Delivery:        DeliveryConfig{Method: "urn:ietf:rfc:8935", EndpointURL: "https://lb/events"},
+		EventsRequested: []string{"e1"},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if out.StreamID != "new-id" {
+		t.Fatalf("stream id: %q", out.StreamID)
+	}
+	if gotBody.StreamID != "" {
+		t.Fatalf("create body should omit stream_id, got %q", gotBody.StreamID)
+	}
+	if gotBody.Description != StreamDescription {
+		t.Fatalf("create body description: %q", gotBody.Description)
+	}
+}
+
+func TestUpdatePutsRequestWithStreamID(t *testing.T) {
+	var gotBody StreamConfig
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			t.Errorf("method: got %s want PUT", r.Method)
+		}
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"stream_id":   "abc",
+			"description": StreamDescription,
+			"delivery":    map[string]any{"method": "urn:ietf:rfc:8935", "endpoint_url": "https://new/events"},
+		})
+	})
+	c := testClient(t, srv)
+	out, err := c.Update(context.Background(), StreamConfig{
+		StreamID:    "abc",
+		Description: StreamDescription,
+		Delivery:    DeliveryConfig{Method: "urn:ietf:rfc:8935", EndpointURL: "https://new/events"},
+	})
+	if err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if gotBody.StreamID != "abc" {
+		t.Fatalf("update body must include stream_id, got %q", gotBody.StreamID)
+	}
+	if out.Delivery.EndpointURL != "https://new/events" {
+		t.Fatalf("updated endpoint: %q", out.Delivery.EndpointURL)
+	}
+}
+
+func TestDeleteSendsStreamID(t *testing.T) {
+	var gotQuery string
+	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete {
+			t.Errorf("method: got %s want DELETE", r.Method)
+		}
+		gotQuery = r.URL.Query().Get("stream_id")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	c := testClient(t, srv)
+	if err := c.Delete(context.Background(), "abc"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if gotQuery != "abc" {
+		t.Fatalf("delete stream_id: got %q", gotQuery)
+	}
+}
