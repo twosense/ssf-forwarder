@@ -1,24 +1,33 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"strings"
 
 	_ "github.com/twosense/ssf-forwarder/internal/caepext" // Register custom CAEP event parsers
 	"github.com/twosense/ssf-forwarder/internal/config"
-	"github.com/twosense/ssf-forwarder/internal/handler"
 )
 
 func main() {
-	configPath := flag.String("config", "config.yaml", "path to config file")
-	flag.Parse()
+	defaultConfigPath := os.Getenv("SSF_FORWARDER_CONFIG_PATH")
+	if defaultConfigPath == "" {
+		defaultConfigPath = "config.yaml"
+	}
+
+	args := os.Args[1:]
+	command := "serve"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command = args[0]
+		args = args[1:]
+	}
+
+	fs := flag.NewFlagSet(command, flag.ExitOnError)
+	configPath := fs.String("config", defaultConfigPath, "path to config file")
+	if err := fs.Parse(args); err != nil {
+		os.Exit(2)
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -26,63 +35,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	meta, err := fetchTransmitterMetadata(ctx, cfg.Transmitter.MetadataURL)
-	if err != nil {
-		slog.Error("fetching transmitter metadata", "err", err)
-		os.Exit(1)
-	}
-
-	sinks, err := buildSinks(cfg.Sinks)
-	if err != nil {
-		slog.Error("building sinks", "err", err)
-		os.Exit(1)
-	}
-
-	pushURL, err := url.JoinPath(cfg.Receiver.PublicURL, cfg.Receiver.Endpoint)
-	if err != nil {
-		slog.Error("building push URL", "err", err)
-		os.Exit(1)
-	}
-
-	stream, err := setupStream(ctx, cfg.Transmitter, pushURL)
-	if err != nil {
-		slog.Error("setting up stream", "err", err)
-		os.Exit(1)
-	}
-
-	slog.Info("stream registered", "push_url", pushURL)
-
-	mux := http.NewServeMux()
-	mux.Handle(cfg.Receiver.Endpoint, handler.New(buildParser(meta), sinks))
-
-	server := &http.Server{
-		Addr:    cfg.Receiver.ListenAddr,
-		Handler: mux,
-	}
-
-	go func() {
-		slog.Info("listening", "addr", cfg.Receiver.ListenAddr)
-
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "err", err)
-			cancel()
-		}
-	}()
-
-	<-ctx.Done()
-	slog.Info("shutting down")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := stream.Delete(shutdownCtx); err != nil {
-		slog.Warn("deleting stream", "err", err)
-	}
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		slog.Warn("server shutdown", "err", err)
+	switch command {
+	case "serve":
+		runServe(cfg)
+	case "register":
+		runRegister(cfg)
+	case "deregister":
+		runDeregister(cfg)
+	default:
+		slog.Error("unknown command", "command", command, "valid", "serve, register, deregister")
+		os.Exit(2)
 	}
 }

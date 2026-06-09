@@ -11,18 +11,6 @@ import (
 	"github.com/twosense/ssf-forwarder/internal/config"
 )
 
-// minimalSSFMetadata returns a JSON-encoded SSF transmitter metadata object
-// whose configuration_endpoint points back to configEndpointURL.
-func minimalSSFMetadata(issuer, configEndpointURL string) []byte {
-	b, _ := json.Marshal(map[string]any{
-		"issuer":                     issuer,
-		"jwks_uri":                   issuer + "/jwks",
-		"delivery_methods_supported": []string{"urn:ietf:rfc:8935"},
-		"configuration_endpoint":     configEndpointURL,
-	})
-	return b
-}
-
 // --- fetchTransmitterMetadata ---
 
 func TestFetchTransmitterMetadata(t *testing.T) {
@@ -181,91 +169,5 @@ func TestBuildAuthorizer(t *testing.T) {
 				t.Error("expected non-nil authorizer")
 			}
 		})
-	}
-}
-
-// --- setupStream ---
-
-func TestSetupStream_TransmitterError(t *testing.T) {
-	tests := []struct {
-		name           string
-		metadataStatus int
-		configStatus   int
-		wantErr        string
-	}{
-		{
-			// 401 is not in the library's retryable status set, so this fails fast.
-			name:           "metadata endpoint returns error",
-			metadataStatus: http.StatusUnauthorized,
-			wantErr:        "failed to fetch transmitter metadata",
-		},
-		{
-			name:           "configuration endpoint rejects stream creation",
-			metadataStatus: http.StatusOK,
-			configStatus:   http.StatusForbidden,
-			wantErr:        "unexpected status code",
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Arrange
-			var serverURL string
-
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/ssf-configuration":
-					if tc.metadataStatus != http.StatusOK {
-						w.WriteHeader(tc.metadataStatus)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					w.Write(minimalSSFMetadata(
-						"https://transmitter.example.com",
-						serverURL+"/config",
-					))
-				case "/config":
-					w.WriteHeader(tc.configStatus)
-				}
-			}))
-			defer server.Close()
-			serverURL = server.URL
-
-			cfg := config.TransmitterConfig{
-				MetadataURL:     server.URL + "/ssf-configuration",
-				Auth:            config.AuthConfig{Type: "bearer", Token: "test-token"},
-				EventsRequested: []string{"https://schemas.openid.net/secevent/caep/event-type/session-revoked"},
-			}
-
-			// Act
-			_, err := setupStream(context.Background(), cfg, "https://receiver.example.com/events")
-
-			// Assert
-			if err == nil {
-				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Fatalf("error %q does not contain %q", err.Error(), tc.wantErr)
-			}
-		})
-	}
-}
-
-func TestSetupStream_InvalidPushURL(t *testing.T) {
-	// Arrange
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
-	defer server.Close()
-
-	cfg := config.TransmitterConfig{
-		MetadataURL: server.URL,
-		Auth:        config.AuthConfig{Type: "bearer", Token: "test-token"},
-	}
-
-	// Act: push URL is not a valid absolute URL
-	_, err := setupStream(context.Background(), cfg, "://bad-url")
-
-	// Assert
-	if err == nil {
-		t.Fatal("expected error for invalid push URL, got nil")
 	}
 }
