@@ -20,6 +20,7 @@ SSF receiver that transforms and forwards events to various sinks.
 - **Format:** `gofmt` / `goimports` — code must be formatted before committing.
 - **Lint:** `go vet ./...` is the baseline. Use `golangci-lint` for broader checks if configured.
 - **Test:** `go test ./...` — use `-race` flag when testing concurrent code.
+- **E2E tests:** live in `test/e2e/` behind a `//go:build e2e` tag, so `go test ./...` skips them. Run with `go test -tags e2e ./test/e2e/...`. They build and drive the actual `ssf-forwarder` binary against a fake transmitter. Set `E2E_DOCKER=1` to run them against the Docker image instead of a local binary — this relies on Docker host networking, which is unavailable on macOS (Docker Desktop), so it only works under Linux with Docker. CI covers this mode. CI runs both modes.
 - **Build:** `go build ./...`
 - **Dependencies:** `go get` / `go mod tidy` — keep `go.sum` committed. Remove unused deps promptly.
 - Avoid build scripts or Makefiles for tasks that `go` commands handle natively.
