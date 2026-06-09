@@ -12,18 +12,21 @@ import (
 	"github.com/twosense/ssf-forwarder/internal/ssfadmin"
 )
 
-func newAdminClient(ctx context.Context, cfg *config.Config) (*ssfadmin.Client, string, error) {
+func buildAdminClient(ctx context.Context, cfg *config.Config) (*ssfadmin.Client, error) {
 	authorizer, err := buildAuthorizer(cfg.Transmitter.Auth)
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
+	return ssfadmin.NewClient(ctx, cfg.Transmitter.MetadataURL, authorizer)
+}
 
+func newAdminClient(ctx context.Context, cfg *config.Config) (*ssfadmin.Client, string, error) {
 	pushURL, err := url.JoinPath(cfg.Receiver.PublicURL, cfg.Receiver.Endpoint)
 	if err != nil {
 		return nil, "", err
 	}
 
-	client, err := ssfadmin.NewClient(ctx, cfg.Transmitter.MetadataURL, authorizer)
+	client, err := buildAdminClient(ctx, cfg)
 	if err != nil {
 		return nil, "", err
 	}

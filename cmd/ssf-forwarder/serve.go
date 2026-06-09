@@ -37,13 +37,7 @@ func runServe(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := func() (*ssfadmin.Client, error) {
-		authorizer, err := buildAuthorizer(cfg.Transmitter.Auth)
-		if err != nil {
-			return nil, err
-		}
-		return ssfadmin.NewClient(ctx, cfg.Transmitter.MetadataURL, authorizer)
-	}()
+	client, err := buildAdminClient(ctx, cfg)
 	if err != nil {
 		slog.Error("creating stream admin client", "err", err)
 		os.Exit(1)
