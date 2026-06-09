@@ -16,9 +16,10 @@ type Config struct {
 }
 
 type ReceiverConfig struct {
-	ListenAddr string `yaml:"listen_addr"`
-	PublicURL  string `yaml:"public_url"`
-	Endpoint   string `yaml:"endpoint"`
+	ListenAddr   string `yaml:"listen_addr"`
+	PublicURL    string `yaml:"public_url"`
+	Endpoint     string `yaml:"endpoint"`
+	AutoRegister *bool  `yaml:"auto_register"`
 }
 
 type TransmitterConfig struct {
@@ -133,5 +134,10 @@ func (c *Config) applyDefaults() {
 
 	if c.Receiver.Endpoint == "" {
 		c.Receiver.Endpoint = "/events"
+	}
+
+	if c.Receiver.AutoRegister == nil {
+		enabled := true
+		c.Receiver.AutoRegister = &enabled
 	}
 }
