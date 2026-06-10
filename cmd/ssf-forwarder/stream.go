@@ -7,11 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sgnl-ai/caep.dev/secevent/pkg/event"
 	seceventparser "github.com/sgnl-ai/caep.dev/secevent/pkg/parser"
 	"github.com/sgnl-ai/caep.dev/ssfreceiver/auth"
-	"github.com/sgnl-ai/caep.dev/ssfreceiver/builder"
-	"github.com/sgnl-ai/caep.dev/ssfreceiver/stream"
 	"github.com/twosense/ssf-forwarder/internal/config"
 	"golang.org/x/oauth2/clientcredentials"
 )
@@ -60,34 +57,6 @@ func buildParser(meta *transmitterMetadata) *seceventparser.Parser {
 	}
 
 	return seceventparser.NewParser(opts...)
-}
-
-func setupStream(ctx context.Context, cfg config.TransmitterConfig, pushURL string) (stream.Stream, error) {
-	authorizer, err := buildAuthorizer(cfg.Auth)
-	if err != nil {
-		return nil, fmt.Errorf("building authorizer: %w", err)
-	}
-
-	eventTypes := make([]event.EventType, len(cfg.EventsRequested))
-	for i, et := range cfg.EventsRequested {
-		eventTypes[i] = event.EventType(et)
-	}
-
-	opts := []builder.Option{
-		builder.WithPushDelivery(pushURL),
-		builder.WithAuth(authorizer),
-		builder.WithExistingCheck(),
-	}
-	if len(eventTypes) > 0 {
-		opts = append(opts, builder.WithEventTypes(eventTypes))
-	}
-
-	b, err := builder.New(cfg.MetadataURL, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("creating stream builder: %w", err)
-	}
-
-	return b.Setup(ctx)
 }
 
 func buildAuthorizer(cfg config.AuthConfig) (auth.Authorizer, error) {

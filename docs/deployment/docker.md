@@ -35,3 +35,20 @@ docker compose up
 ```
 
 `config.yaml` is gitignored to avoid accidentally committing credentials.
+
+## Running multiple instances
+
+Set `auto_register: false` and point every instance's `public_url` at your load balancer, then register the stream once before starting the services:
+
+```sh
+docker compose run --rm ssf-forwarder register
+docker compose up -d
+```
+
+The config path is set via the `SSF_FORWARDER_CONFIG_PATH` env var baked into the image (`/etc/ssf-forwarder/config.yaml`), so subcommands pick it up automatically — no `--config` needed.
+
+`register` is idempotent — re-run it after changing `public_url` or `events_requested`. To remove the stream:
+
+```sh
+docker compose run --rm ssf-forwarder deregister
+```

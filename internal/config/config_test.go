@@ -548,3 +548,52 @@ func TestLoad_FileNotFound(t *testing.T) {
 		t.Errorf("error %q should mention reading config file", err.Error())
 	}
 }
+
+func TestAutoRegisterDefaultsTrue(t *testing.T) {
+	yaml := `
+receiver:
+  public_url: "https://forwarder.example.com"
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+  events_requested:
+    - "https://schemas.openid.net/secevent/caep/event-type/session-revoked"
+sinks:
+  - type: log
+`
+	path := writeTempYAML(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Receiver.AutoRegister == nil || !*cfg.Receiver.AutoRegister {
+		t.Fatalf("AutoRegister: got %v, want true", cfg.Receiver.AutoRegister)
+	}
+}
+
+func TestAutoRegisterExplicitFalseRespected(t *testing.T) {
+	yaml := `
+receiver:
+  public_url: "https://forwarder.example.com"
+  auto_register: false
+transmitter:
+  metadata_url: "https://transmitter.example.com/.well-known/ssf-configuration"
+  auth:
+    type: bearer
+    token: "secret"
+  events_requested:
+    - "https://schemas.openid.net/secevent/caep/event-type/session-revoked"
+sinks:
+  - type: log
+`
+	path := writeTempYAML(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.Receiver.AutoRegister == nil || *cfg.Receiver.AutoRegister {
+		t.Fatalf("AutoRegister: got %v, want false", cfg.Receiver.AutoRegister)
+	}
+}

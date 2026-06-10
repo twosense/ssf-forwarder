@@ -1,88 +1,88 @@
 package main
 
 import (
-	"context"
+	"errors"
 	"flag"
+	"fmt"
+	"io"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"os"
-	"os/signal"
-	"syscall"
-	"time"
+	"strings"
 
 	_ "github.com/twosense/ssf-forwarder/internal/caepext" // Register custom CAEP event parsers
 	"github.com/twosense/ssf-forwarder/internal/config"
-	"github.com/twosense/ssf-forwarder/internal/handler"
 )
 
-func main() {
-	configPath := flag.String("config", "config.yaml", "path to config file")
-	flag.Parse()
+const usage = `usage: ssf-forwarder [command] [flags]
 
-	cfg, err := config.Load(*configPath)
+Commands:
+  serve       receive and forward events (default)
+  register    register the stream with the transmitter
+  deregister  delete the registered stream
+
+Flags:
+  -config path
+        path to config file (default $SSF_FORWARDER_CONFIG_PATH or config.yaml)
+`
+
+// parseArgs resolves the subcommand and flags from the command line. The
+// subcommand must come before any flags, matching the convention of the go
+// tool itself; a positional argument left over after flag parsing is an error
+// rather than being silently ignored.
+func parseArgs(args []string, defaultConfigPath string) (command, configPath string, err error) {
+	command = "serve"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		command = args[0]
+		args = args[1:]
+	}
+
+	switch command {
+	case "serve", "register", "deregister":
+	default:
+		return "", "", fmt.Errorf("unknown command %q", command)
+	}
+
+	fs := flag.NewFlagSet(command, flag.ContinueOnError)
+	fs.SetOutput(io.Discard) // main reports errors and usage itself
+	configFlag := fs.String("config", defaultConfigPath, "path to config file")
+	if err := fs.Parse(args); err != nil {
+		return "", "", err
+	}
+	if fs.NArg() > 0 {
+		return "", "", fmt.Errorf("unexpected argument %q: the command must come before any flags", fs.Arg(0))
+	}
+
+	return command, *configFlag, nil
+}
+
+func main() {
+	defaultConfigPath := os.Getenv("SSF_FORWARDER_CONFIG_PATH")
+	if defaultConfigPath == "" {
+		defaultConfigPath = "config.yaml"
+	}
+
+	command, configPath, err := parseArgs(os.Args[1:], defaultConfigPath)
+	if errors.Is(err, flag.ErrHelp) {
+		fmt.Print(usage)
+		os.Exit(0)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ssf-forwarder: %v\n\n%s", err, usage)
+		os.Exit(2)
+	}
+
+	cfg, err := config.Load(configPath)
 	if err != nil {
 		slog.Error("loading config", "err", err)
 		os.Exit(1)
 	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
-	defer cancel()
-
-	meta, err := fetchTransmitterMetadata(ctx, cfg.Transmitter.MetadataURL)
-	if err != nil {
-		slog.Error("fetching transmitter metadata", "err", err)
-		os.Exit(1)
-	}
-
-	sinks, err := buildSinks(cfg.Sinks)
-	if err != nil {
-		slog.Error("building sinks", "err", err)
-		os.Exit(1)
-	}
-
-	pushURL, err := url.JoinPath(cfg.Receiver.PublicURL, cfg.Receiver.Endpoint)
-	if err != nil {
-		slog.Error("building push URL", "err", err)
-		os.Exit(1)
-	}
-
-	stream, err := setupStream(ctx, cfg.Transmitter, pushURL)
-	if err != nil {
-		slog.Error("setting up stream", "err", err)
-		os.Exit(1)
-	}
-
-	slog.Info("stream registered", "push_url", pushURL)
-
-	mux := http.NewServeMux()
-	mux.Handle(cfg.Receiver.Endpoint, handler.New(buildParser(meta), sinks))
-
-	server := &http.Server{
-		Addr:    cfg.Receiver.ListenAddr,
-		Handler: mux,
-	}
-
-	go func() {
-		slog.Info("listening", "addr", cfg.Receiver.ListenAddr)
-
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("server error", "err", err)
-			cancel()
-		}
-	}()
-
-	<-ctx.Done()
-	slog.Info("shutting down")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := stream.Delete(shutdownCtx); err != nil {
-		slog.Warn("deleting stream", "err", err)
-	}
-
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		slog.Warn("server shutdown", "err", err)
+	switch command {
+	case "serve":
+		runServe(cfg)
+	case "register":
+		runRegister(cfg)
+	case "deregister":
+		runDeregister(cfg)
 	}
 }
