@@ -37,16 +37,20 @@ func runServe(cfg *config.Config) {
 		os.Exit(1)
 	}
 
-	client, err := buildAdminClient(ctx, cfg)
-	if err != nil {
-		slog.Error("creating stream admin client", "err", err)
-		os.Exit(1)
-	}
-
 	autoRegister := cfg.Receiver.AutoRegister != nil && *cfg.Receiver.AutoRegister
 
+	// Registration needs the admin client, so a failure to build one is fatal
+	// there. The boot safeguard only verifies, so it warns and keeps serving —
+	// a transmitter may legally omit configuration_endpoint from its metadata.
+	var client *ssfadmin.Client
 	var registeredStreamID string
 	if autoRegister {
+		client, err = buildAdminClient(ctx, cfg)
+		if err != nil {
+			slog.Error("creating stream admin client", "err", err)
+			os.Exit(1)
+		}
+
 		action, stream, err := ssfadmin.Reconcile(ctx, client, pushURL, cfg.Transmitter.EventsRequested)
 		if err != nil {
 			slog.Error("registering stream", "err", err)
@@ -61,7 +65,12 @@ func runServe(cfg *config.Config) {
 				"action", action, "stream_id", stream.StreamID, "push_url", pushURL)
 		}
 	} else {
-		runBootSafeguard(ctx, client, pushURL)
+		safeguardClient, err := buildAdminClient(ctx, cfg)
+		if err != nil {
+			slog.Warn("could not verify stream registration; continuing", "err", err)
+		} else {
+			runBootSafeguard(ctx, safeguardClient, pushURL)
+		}
 	}
 
 	mux := http.NewServeMux()
