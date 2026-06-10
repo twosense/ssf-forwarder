@@ -170,8 +170,15 @@ func (c *Client) Update(ctx context.Context, cfg StreamConfig) (*StreamConfig, e
 
 // Delete removes the stream with the given ID.
 func (c *Client) Delete(ctx context.Context, streamID string) error {
-	deleteURL := c.configEndpoint + "?" + url.Values{"stream_id": {streamID}}.Encode()
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, nil)
+	endpoint, err := url.Parse(c.configEndpoint)
+	if err != nil {
+		return fmt.Errorf("parsing configuration endpoint: %w", err)
+	}
+	query := endpoint.Query()
+	query.Set("stream_id", streamID)
+	endpoint.RawQuery = query.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint.String(), nil)
 	if err != nil {
 		return fmt.Errorf("creating delete request: %w", err)
 	}

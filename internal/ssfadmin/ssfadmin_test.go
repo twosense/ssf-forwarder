@@ -203,6 +203,37 @@ func TestDeleteEncodesStreamID(t *testing.T) {
 	}
 }
 
+func TestDeletePreservesEndpointQuery(t *testing.T) {
+	var gotStreamID, gotTenant string
+	mux := http.NewServeMux()
+	var srv *httptest.Server
+	mux.HandleFunc("/.well-known/ssf-configuration", func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"issuer":                     "https://transmitter.example.com",
+			"configuration_endpoint":     srv.URL + "/streams?tenant=acme",
+			"delivery_methods_supported": []string{"urn:ietf:rfc:8935"},
+		})
+	})
+	mux.HandleFunc("/streams", func(w http.ResponseWriter, r *http.Request) {
+		gotStreamID = r.URL.Query().Get("stream_id")
+		gotTenant = r.URL.Query().Get("tenant")
+		w.WriteHeader(http.StatusNoContent)
+	})
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	c := testClient(t, srv)
+	if err := c.Delete(context.Background(), "abc"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if gotStreamID != "abc" {
+		t.Errorf("stream_id: got %q want %q", gotStreamID, "abc")
+	}
+	if gotTenant != "acme" {
+		t.Errorf("tenant: got %q want %q; the endpoint's own query parameters must survive", gotTenant, "acme")
+	}
+}
+
 func TestDeleteTreats404AsSuccess(t *testing.T) {
 	srv := newTestTransmitter(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
